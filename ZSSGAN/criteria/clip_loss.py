@@ -1,3 +1,4 @@
+import pickle
 import torch
 import torchvision.transforms as transforms
 import torch.nn.functional as F
@@ -7,6 +8,7 @@ import numpy as np
 import math
 import clip
 from PIL import Image
+from sklearn.decomposition import PCA
 
 from ZSSGAN.utils.text_templates import imagenet_templates, part_templates, imagenet_templates_small
 
@@ -109,9 +111,34 @@ class CLIPLoss(torch.nn.Module):
 
         return image_features
 
+    def interact_with_gan(self, vec, n_components=256, keep_first=True):
+        '''
+        Interact information with stylegan to keep or remove some bias.
+        '''
+        gan_sample_path = '/home/ybyb/CODE/StyleGAN-nada/results/ffhq/Vincent_Van_Goph/orig_samples/samples.pkl'
+        # Read samples from file
+        with open(gan_sample_path, 'rb') as f:
+            X = pickle.load(f)
+            X = np.array(X)
+        
+        # Define a PCA and train it
+        pca = PCA(n_components=n_components)
+        pca.fit(X)
+
+        # Reduce dim of vec so that info related to stylegan is keeped.
+        vec_trans = pca.transform(vec.cpu().numpy())
+        vec_inv = pca.inverse_transform(vec_trans)
+
+        if keep_first:
+            return torch.from_numpy(vec_inv).to(vec.device)
+        else:
+            return vec - torch.from_numpy(vec_inv).to(vec.device)
+
     def compute_text_direction(self, source_class: str, target_class: str) -> torch.Tensor:
         source_features = self.get_text_features(source_class)
         target_features = self.get_text_features(target_class)
+        # Remove info similar to StyleGAN
+        target_features = self.interact_with_gan(target_features, n_components=16, keep_first=False)
 
         text_direction = (target_features - source_features).mean(axis=0, keepdim=True)
         text_direction /= text_direction.norm(dim=-1, keepdim=True)
@@ -168,7 +195,7 @@ class CLIPLoss(torch.nn.Module):
 
     def compose_text_with_templates(self, text: str, templates=imagenet_templates) -> list:
         return [template.format(text) for template in templates]
-            
+   
     def clip_directional_loss(self, src_img: torch.Tensor, source_class: str, target_img: torch.Tensor, target_class: str) -> torch.Tensor:
 
         if self.target_direction is None:

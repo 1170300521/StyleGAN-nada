@@ -7,8 +7,9 @@ import math
 import torch
 import numpy as np
 from torchvision import utils
-
+sys.path.append("./ZSSGAN")
 from ZSSGAN.model.sg2_model import Generator, Discriminator
+
 
 def convert_modconv(vars, source_name, target_name, flip=False):
     weight = vars[source_name + "/weight"].value().eval()
@@ -224,7 +225,7 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
-    sys.path.append(args.repo)
+    #sys.path.append(args.repo)
 
     import dnnlib
     from dnnlib import tflib

@@ -55,7 +55,9 @@ class SG2Generator(torch.nn.Module):
             return self.get_all_layers() 
         else: 
             # everything except mapping and ToRGB
-            return list(self.get_all_layers())[1:3] + list(self.get_all_layers()[4][:])  
+            return list(self.get_all_layers())[1:3] + list(self.get_all_layers()[4][:])
+            # Same with that when auto_layer_iters > 0 and auto_layer_k = 18
+            # return list(self.get_all_layers())[2:4] + list(self.get_all_layers()[4][:])  
 
     def freeze_layers(self, layer_list=None):
         '''
