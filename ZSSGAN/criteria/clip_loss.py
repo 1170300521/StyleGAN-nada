@@ -186,12 +186,13 @@ class CLIPLoss(torch.nn.Module):
         # target_features = self.interact_with_gan(target_features, n_components=16, keep_first=False)
         
         # Supress normal features and keep special features in the text feature
-        target_features = self.supress_normal_features(target_features, 2)
-        if self.args.supress_src > 0:
+        if self.alpha > 0:
+            target_features = self.supress_normal_features(target_features, 2)
+        if self.args.supress_src > 0 and self.alpha > 0:
             source_features = self.supress_normal_features(source_features, self.args.supress_src)
 
-        # text_direction = (target_features - source_features).mean(axis=0, keepdim=True)
-        text_direction = target_features.mean(axis=0, keepdim=True)
+        text_direction = (target_features - source_features).mean(axis=0, keepdim=True)
+        # text_direction = target_features.mean(axis=0, keepdim=True)
         text_direction /= text_direction.norm(dim=-1, keepdim=True)
 
         return text_direction

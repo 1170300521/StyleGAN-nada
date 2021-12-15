@@ -42,11 +42,13 @@ from model.ZSSGAN import ZSSGAN
 import shutil
 import json
 import pickle
+import matplotlib.pyplot as plt
 
 from utils.file_utils import copytree, save_images, save_paper_image_grid
 from utils.training_utils import mixing_noise
 
 from options.train_options import TrainOptions
+from criteria.clip_loss import CLIPLoss
 
 #TODO convert these to proper args
 SAVE_SRC = True
@@ -118,10 +120,47 @@ def visual(args):
             save_images(sampled_dst, sample_dir, "dst", grid_rows, 0)
      
 
+def visualize_pca_weights(args):
+    args.alpha = 1
+    clip_loss = CLIPLoss('cuda', 
+                        lambda_direction=args.lambda_direction, 
+                        lambda_patch=args.lambda_patch, 
+                        lambda_global=args.lambda_global, 
+                        lambda_manifold=args.lambda_manifold, 
+                        lambda_texture=args.lambda_texture,
+                        clip_model=args.clip_models[0],
+                        args=args)
+    tgt_vec_list = clip_loss.get_text_features(args.target_class).cpu().numpy()  # Multiple vectors due to prompt engineer
+    tgt_pca_list = clip_loss.pca.transform(tgt_vec_list)
+    threshold = clip_loss.threshold
+    x = np.arange(len(threshold))
+    l1 = plt.plot(x, tgt_pca_list[0], 'g', label='target_sample')
+    # l2 = plt.plot(x, tgt_pca_list.mean(0), 'b', label='target_mean')
+    l3 = plt.plot(x, threshold, 'r', label='pos_threshold')
+    l4 = plt.plot(x, -threshold, 'r', label='neg_threshold')
+    speical_num = (np.abs(tgt_pca_list[0]) > threshold).sum()
+    # plt.plot(x, tgt_pca_list[0], 'go-', x, tgt_pca_list.mean(0), 'b+-', x, threshold, 'r^-')
+    plt.xlabel('dimension')
+    plt.ylabel('value')
+    plt.title(args.target_class + ", Special " + str(speical_num))
+    plt.legend()
+    plt.ylim(-0.3, 0.3)
+    plt.savefig(os.path.join(args.output_dir, args.target_class.replace(" ", '_') + ".jpg"))
+    plt.show()
+
+
 if __name__ == "__main__":
 
     args = TrainOptions().parse()
-
     # visual(args)
-    get_samples(args)
+    # get_samples(args)
+    target_list = ["Van Goph painting", "Miyazaki Hayao painting", "Fernando Botero painting",\
+        "3D render in the style of Pixar", "Disney Princess", "White Walker",\
+            "Sketch", "Anime", "Watercolor art with thick brushstrokes"]
+    os.makedirs(args.output_dir, exist_ok=True)
+    for target in target_list:
+        args.target_class = target
+        visualize_pca_weights(args)
+    
+
     
