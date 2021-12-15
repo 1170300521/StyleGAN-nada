@@ -172,7 +172,8 @@ class ZSSGAN(torch.nn.Module):
                                                       lambda_global=args.lambda_global, 
                                                       lambda_manifold=args.lambda_manifold, 
                                                       lambda_texture=args.lambda_texture,
-                                                      clip_model=model_name) 
+                                                      clip_model=model_name,
+                                                      args=args) 
                                 for model_name in args.clip_models}
 
         self.clip_model_weights = {model_name: weight for model_name, weight in zip(args.clip_models, args.clip_model_weights)}

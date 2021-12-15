@@ -25,7 +25,7 @@ class TrainOptions(object):
         self.parser.add_argument(
             "--output_dir",
             type=str,
-            required=True,
+            default='demo',
             help="Path to output directory",
         )
 
@@ -34,6 +34,27 @@ class TrainOptions(object):
             type=float,
             default=1.0,
             help="Strength of directional clip loss",
+        )
+
+        self.parser.add_argument(
+            "--alpha",
+            type=float,
+            default=0,
+            help="Coefficient to adjust the degree to supress normal features of the given text"
+        )
+        
+        self.parser.add_argument(
+            "--enhance",
+            action="store_true",
+            help="Whether to use enhance supression",
+        )
+
+        self.parser.add_argument(
+            "--supress_src",
+            type=int,
+            default=0,
+            help="How to supress source class; 0 reps no, 1 reps using same dimensions as target \
+                class, 2 reps supressing itself.",
         )
 
         ######################################################################################################
@@ -93,6 +114,12 @@ class TrainOptions(object):
             "--target_class",
             default="cat",
             help="Textual description of the target class.",
+        )
+
+        self.parser.add_argument(
+            '--dataset',
+            default='ffhq',
+            help = "Pretraining dataset"
         )
 
         # Used for manual layer choices. Leave as None to use paper layers.

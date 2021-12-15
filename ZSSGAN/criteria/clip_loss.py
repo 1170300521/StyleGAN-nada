@@ -32,10 +32,13 @@ class DirectionLoss(torch.nn.Module):
         return self.loss_func(x, y)
 
 class CLIPLoss(torch.nn.Module):
-    def __init__(self, device, lambda_direction=1., lambda_patch=0., lambda_global=0., lambda_manifold=0., lambda_texture=0., patch_loss_type='mae', direction_loss_type='cosine', clip_model='ViT-B/32'):
+    def __init__(self, device, lambda_direction=1., lambda_patch=0., lambda_global=0., \
+        lambda_manifold=0., lambda_texture=0., patch_loss_type='mae', \
+            direction_loss_type='cosine', clip_model='ViT-B/32', args=None):
         super(CLIPLoss, self).__init__()
 
         self.device = device
+        self.args = args
         self.model, clip_preprocess = clip.load(clip_model, device=self.device)
 
         self.clip_preprocess = clip_preprocess
@@ -56,6 +59,7 @@ class CLIPLoss(torch.nn.Module):
         self.lambda_direction = lambda_direction
         self.lambda_manifold  = lambda_manifold
         self.lambda_texture   = lambda_texture
+        self.alpha = args.alpha
 
         self.src_text_features = None
         self.target_text_features = None
@@ -67,6 +71,25 @@ class CLIPLoss(torch.nn.Module):
                                         preprocess_cnn.transforms[4:])                                                  # + skip convert PIL to tensor
 
         self.texture_loss = torch.nn.MSELoss()
+        self.pca, self.threshold = self.get_pca()
+        self.cond = None
+
+    def get_pca(self):
+        orig_sample_path = '/home/ybyb/CODE/StyleGAN-nada/results/ffhq/samples.pkl'
+        with open(orig_sample_path, 'rb') as f:
+            X = pickle.load(f)
+            X = np.array(X)
+        
+        # Define a pca and train it
+        pca = PCA(n_components=512)
+        pca.fit(X)
+
+        # Get the standar deviation of samples and set threshold for each dimension
+        threshold = np.sqrt(pca.explained_variance_) * self.alpha
+
+        if self.args.enhance:
+            threshold = threshold * (threshold / (threshold.mean() + 1e-8))
+        return pca, threshold
 
     def tokenize(self, strings: list):
         return clip.tokenize(strings).to(self.device)
@@ -115,7 +138,7 @@ class CLIPLoss(torch.nn.Module):
         '''
         Interact information with stylegan to keep or remove some bias.
         '''
-        gan_sample_path = '/home/ybyb/CODE/StyleGAN-nada/results/ffhq/Vincent_Van_Goph/orig_samples/samples.pkl'
+        gan_sample_path = '/home/ybyb/CODE/StyleGAN-nada/results/ffhq/samples.pkl'
         # Read samples from file
         with open(gan_sample_path, 'rb') as f:
             X = pickle.load(f)
@@ -134,13 +157,41 @@ class CLIPLoss(torch.nn.Module):
         else:
             return vec - torch.from_numpy(vec_inv).to(vec.device)
 
+    def supress_normal_features(self, vec, supress_type=2):
+        '''
+        Supress normal features of the given vector based on original StyleGAN
+
+        Params:
+            vec: the vector to be supressed
+        '''
+        # Supress the given vector
+        vec_trans = self.pca.transform(vec.cpu().numpy())
+        if supress_type == 2:
+            cond = (np.abs(vec_trans) > self.threshold[np.newaxis, :])
+            cond.astype(np.float)
+            self.cond = cond
+        else:
+            cond = self.cond
+
+        vec_trans = vec_trans * cond
+
+        vec_sup = self.pca.inverse_transform(vec_trans)
+        return torch.from_numpy(vec_sup).to(vec.device)
+
     def compute_text_direction(self, source_class: str, target_class: str) -> torch.Tensor:
         source_features = self.get_text_features(source_class)
         target_features = self.get_text_features(target_class)
+        
         # Remove info similar to StyleGAN
-        target_features = self.interact_with_gan(target_features, n_components=16, keep_first=False)
+        # target_features = self.interact_with_gan(target_features, n_components=16, keep_first=False)
+        
+        # Supress normal features and keep special features in the text feature
+        target_features = self.supress_normal_features(target_features, 2)
+        if self.args.supress_src > 0:
+            source_features = self.supress_normal_features(source_features, self.args.supress_src)
 
-        text_direction = (target_features - source_features).mean(axis=0, keepdim=True)
+        # text_direction = (target_features - source_features).mean(axis=0, keepdim=True)
+        text_direction = target_features.mean(axis=0, keepdim=True)
         text_direction /= text_direction.norm(dim=-1, keepdim=True)
 
         return text_direction
