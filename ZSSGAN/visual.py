@@ -43,6 +43,7 @@ import shutil
 import json
 import pickle
 import matplotlib.pyplot as plt
+from sklearn.decomposition import PCA
 
 from utils.file_utils import copytree, save_images, save_paper_image_grid
 from utils.training_utils import mixing_noise
@@ -60,13 +61,20 @@ def get_samples(args, n_samples=10000):
     '''
     Sample images from GAN and embed them into clip representation space (norm)
     '''
+    # Set up output directories.
+    desc = args.source_class.replace(" ", '_') + "+" + args.target_class.replace(" ", "_")
+    prefix = f"supress_src_{args.supress_src}-alpha_{args.alpha}"
+    if args.enhance:
+        prefix = "enhance-" + prefix
+    args.output_dir = os.path.join("../results", args.dataset, desc, prefix)
+    sample_dir = args.output_dir
+    os.makedirs(sample_dir, exist_ok=True)
     # Set up networks, optimizers.
     print("Initializing networks...")
+    if os.path.exists(os.path.join(sample_dir, 'checkpoint', '000300.pt')):
+        args.frozen_gen_ckpt = os.path.join(sample_dir, 'checkpoint', '000300.pt')
+        print("Use pretrained weights from {}".format(os.path.join(sample_dir, 'checkpoint', '000300.pt')))
     net = ZSSGAN(args)
-
-    # Set up output directories.
-    sample_dir = os.path.join(args.output_dir, 'orig_samples')
-    os.makedirs(sample_dir, exist_ok=True)
     # set seed after all networks have been initialized. Avoids change of outputs due to model changes.
     torch.manual_seed(2)
     np.random.seed(2)
@@ -134,7 +142,7 @@ def visualize_pca_weights(args):
     tgt_pca_list = clip_loss.pca.transform(tgt_vec_list)
     threshold = clip_loss.threshold
     x = np.arange(len(threshold))
-    l1 = plt.plot(x, tgt_pca_list[0], 'g', label='target_sample')
+    l1 = plt.scatter(x, tgt_pca_list[0], s=5)
     # l2 = plt.plot(x, tgt_pca_list.mean(0), 'b', label='target_mean')
     l3 = plt.plot(x, threshold, 'r', label='pos_threshold')
     l4 = plt.plot(x, -threshold, 'r', label='neg_threshold')
@@ -149,18 +157,55 @@ def visualize_pca_weights(args):
     plt.show()
 
 
+def visualize_img_pca_weights(args):
+    args.alpha = 1
+    src_sample_path = '/home/ybyb/CODE/StyleGAN-nada/results/ffhq/samples.pkl'
+    tgt_sample_path = '/home/ybyb/CODE/StyleGAN-nada/results/coco.pkl'
+    # tgt_sample_path = '/home/ybyb/CODE/StyleGAN-nada/results/ffhq/photo+Van_Goph_painting/supress_src_0-alpha_0/samples.pkl'
+    with open(src_sample_path, 'rb') as f:
+        X = pickle.load(f)
+        X = np.array(X)
+        # Define a pca and train it
+    pca = PCA(n_components=512)
+    pca.fit(X)
+
+    if src_sample_path == tgt_sample_path:
+        Y = X
+    else:
+        with open(tgt_sample_path, 'rb') as f:
+            Y = pickle.load(f)
+            Y = np.array(Y)
+
+    # Get the standar deviation of samples and set threshold for each dimension
+    threshold = np.sqrt(pca.explained_variance_) * args.alpha
+    x = np.arange(len(threshold))
+    l1 = plt.plot(x, threshold, 'r', label='pos_threshold')
+    l2 = plt.plot(x, -threshold, 'r', label='neg_threshold')
+    plt.legend()
+    plt.ylim(-0.3, 0.3)
+    plt.xlabel('dimension')
+    plt.ylabel('value')
+    Y_pca = pca.transform(Y)
+    np.random.shuffle(Y_pca)
+    for i in range(100):
+        plt.scatter(x, Y_pca[i], s=1)
+    plt.savefig(os.path.join(args.output_dir, "Van_goph_img.jpg"))
+    plt.show()
+
+
 if __name__ == "__main__":
 
     args = TrainOptions().parse()
     # visual(args)
     # get_samples(args)
-    target_list = ["Van Goph painting", "Miyazaki Hayao painting", "Fernando Botero painting",\
-        "3D render in the style of Pixar", "Disney Princess", "White Walker",\
-            "Sketch", "Anime", "Watercolor art with thick brushstrokes"]
-    os.makedirs(args.output_dir, exist_ok=True)
+    # target_list = ["Van Goph painting", "Miyazaki Hayao painting", "Fernando Botero painting",\
+    #     "3D render in the style of Pixar", "Disney Princess", "White Walker",\
+    #         "Sketch", "Anime", "Watercolor art with thick brushstrokes"]
+    target_list = ["Van Goph painting", "Miyazaki Hayao painting", "Sketch"]
+    # os.makedirs(args.output_dir, exist_ok=True)
     for target in target_list:
         args.target_class = target
         visualize_pca_weights(args)
-    
-
+        # get_samples(args)
+    # visualize_img_pca_weights(args)
     

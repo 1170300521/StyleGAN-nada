@@ -9,6 +9,6 @@ CUDA_VISIBLE_DEVICES=0 python ablation.py  \
                 --auto_layer_iters 0 --auto_layer_batch 8 \
                 --output_interval 50 \
                 --mixing 0.0 \
-                --save_interval 1500 \
+                --save_interval 300 \
                 --clip_models "ViT-B/32" \
                 --clip_model_weights 1.0 \

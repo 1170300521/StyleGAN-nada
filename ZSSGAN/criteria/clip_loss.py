@@ -72,13 +72,17 @@ class CLIPLoss(torch.nn.Module):
 
         self.texture_loss = torch.nn.MSELoss()
         self.pca, self.threshold = self.get_pca()
+        self.pca_mean = torch.from_numpy(self.pca.mean_).float().to(self.device)
+        self.pca_cov = torch.from_numpy(self.pca.components_).float().to(self.device)
         self.cond = None
+        self.orig_std = None
 
     def get_pca(self):
         orig_sample_path = '/home/ybyb/CODE/StyleGAN-nada/results/ffhq/samples.pkl'
         with open(orig_sample_path, 'rb') as f:
             X = pickle.load(f)
             X = np.array(X)
+            self.orig_std = np.std(X, axis=0)
         
         # Define a pca and train it
         pca = PCA(n_components=512)
@@ -86,6 +90,7 @@ class CLIPLoss(torch.nn.Module):
 
         # Get the standar deviation of samples and set threshold for each dimension
         threshold = np.sqrt(pca.explained_variance_) * self.alpha
+        # threshold = pca.explained_variance_ * self.alpha
 
         if self.args.enhance:
             threshold = threshold * (threshold / (threshold.mean() + 1e-8))
@@ -272,6 +277,19 @@ class CLIPLoss(torch.nn.Module):
 
         return (1. - logits_per_image / 100).mean()
 
+    def adaptive_global_clip_loss(self, img: torch.Tensor, text) -> torch.Tensor:
+        if self.alpha == 0:
+            return self.global_clip_loss(img, text)
+        text_features = self.get_text_features(text, templates=['{}'])
+        img_features = self.get_image_features(img)
+
+        text_features = text_features - self.pca_mean.unsqueeze(0)
+        text_features = text_features @ self.pca_cov.t()
+        img_features = img_features - self.pca_mean.unsqueeze(0)
+        img_features = img_features @ self.pca_cov.t()
+        logits_per_img = img_features @ text_features.t()
+        return (1. - logits_per_img).mean()
+        
     def random_patch_centers(self, img_shape, num_patches, size):
         batch_size, channels, height, width = img_shape
 

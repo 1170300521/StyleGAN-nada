@@ -159,9 +159,10 @@ if __name__ == "__main__":
         'car': 512,
     }
     # save snapshot of code / args before training.
-    target_list = ["Van Goph painting", "Miyazaki Hayao painting", "Fernando Botero painting",\
-        "3D render in the style of Pixar", "Disney Princess", "White Walker",\
-            "Sketch", "Anime", "Watercolor art with thick brushstrokes"]
+    # target_list = ["Van Goph painting", "Miyazaki Hayao painting", "Fernando Botero painting",\
+    #     "3D render in the style of Pixar", "Disney Princess", "White Walker",\
+    #         "Sketch", "Anime", "Watercolor art with thick brushstrokes"]
+    target_list = ["Van Goph painting", "Miyazaki Hayao painting", "Sketch"]
     #alpha_list = [0, 0.5, 1, 1.5, 2]
     alpha_list = [0]
     enhance_list = [False, True]

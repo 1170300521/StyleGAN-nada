@@ -92,7 +92,7 @@ class SG2Generator(torch.nn.Module):
     def modulation_layers(self):
         return self.generator.modulation_layers
 
-    #TODO Maybe convert to kwargs
+    # TODO Maybe convert to kwargs
     def forward(self,
         styles,
         return_latents=False,
