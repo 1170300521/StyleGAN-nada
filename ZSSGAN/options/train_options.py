@@ -39,22 +39,29 @@ class TrainOptions(object):
         self.parser.add_argument(
             "--alpha",
             type=float,
-            default=0,
+            default=1,
             help="Coefficient to adjust the degree to supress normal features of the given text"
         )
         
+        # self.parser.add_argument(
+        #     "--enhance",
+        #     action="store_true",
+        #     help="Whether to use enhance supression",
+        # )
+
         self.parser.add_argument(
-            "--enhance",
-            action="store_true",
-            help="Whether to use enhance supression",
+            "--supress",
+            type=int,
+            default=0,
+            help="How to supress source class; 0 reps no, 1 reps using CLIP space \
+                class, 2 reps using PCA space.",
         )
 
         self.parser.add_argument(
-            "--supress_src",
+            "--pca_dim",
             type=int,
-            default=0,
-            help="How to supress source class; 0 reps no, 1 reps using same dimensions as target \
-                class, 2 reps supressing itself.",
+            default=None,
+            help="The number of dimensions used for PCA, and None reps using all dimensions"
         )
 
         ######################################################################################################
