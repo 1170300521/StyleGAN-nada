@@ -5,12 +5,12 @@ import torch.nn.functional as F
 
 import numpy as np
 
-import math
 import clip
 from PIL import Image
 from sklearn.decomposition import PCA
 
 from ZSSGAN.utils.text_templates import imagenet_templates, part_templates, imagenet_templates_small
+
 
 class DirectionLoss(torch.nn.Module):
 
@@ -399,7 +399,8 @@ class CLIPLoss(torch.nn.Module):
         if self.lambda_manifold:
             clip_loss += self.lambda_manifold * self.clip_angle_loss(src_img, source_class, target_img, target_class)
 
-        if self.lambda_texture and (texture_image is not None):
-            clip_loss += self.lambda_texture * self.cnn_feature_loss(texture_image, target_img)
-
+        # if self.lambda_texture and (texture_image is not None):
+        if self.lambda_texture:
+            # clip_loss += self.lambda_texture * self.cnn_feature_loss(texture_image, target_img)
+            clip_loss += self.lambda_texture * self.cnn_feature_loss(src_img, target_img)
         return clip_loss

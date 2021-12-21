@@ -12,7 +12,8 @@ import copy
 from functools import partial
 
 from ZSSGAN.model.sg2_model import Generator, Discriminator
-from ZSSGAN.criteria.clip_loss import CLIPLoss       
+from ZSSGAN.criteria.clip_loss import CLIPLoss 
+from ZSSGAN.criteria.regularize_loss import RegularizeLoss      
 
 def requires_grad(model, flag=True):
     for p in model.parameters():
@@ -180,6 +181,12 @@ class ZSSGAN(torch.nn.Module):
 
         self.mse_loss  = torch.nn.MSELoss()
 
+        self.regularize_loss = RegularizeLoss(self.device,
+                                            lambda_across=args.lambda_across,
+                                            lambda_within=args.lambda_within,
+                                            clip_model=args.clip_models[0],
+                                            args=args)
+
         self.source_class = args.source_class
         self.target_class = args.target_class
 
@@ -256,6 +263,7 @@ class ZSSGAN(torch.nn.Module):
         input_is_latent=False,
         noise=None,
         randomize_noise=True,
+        iter=1,
     ):
 
         if self.training and self.auto_layer_iters > 0:
@@ -280,6 +288,10 @@ class ZSSGAN(torch.nn.Module):
         
         clip_loss = torch.sum(torch.stack([self.clip_model_weights[model_name] * self.clip_loss_models[model_name](frozen_img, self.source_class, trainable_img, self.target_class) for model_name in self.clip_model_weights.keys()]))
 
+        if (self.args.lambda_within + self.args.lambda_across > 0) and \
+            iter % self.args.regularize_step == 0:
+            clip_loss += self.regularize_loss(frozen_img, trainable_img)
+            print("Regularize at step {}!".format(iter))
         return [frozen_img, trainable_img], clip_loss
 
     def pivot(self):

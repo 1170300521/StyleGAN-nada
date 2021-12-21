@@ -37,6 +37,27 @@ class TrainOptions(object):
         )
 
         self.parser.add_argument(
+            "--lambda_within",
+            type=float,
+            default=0,
+            help="Strength of clip within loss",
+        )
+
+        self.parser.add_argument(
+            "--lambda_across",
+            type=float,
+            default=0,
+            help="Strength of clip across loss",
+        )
+
+        self.parser.add_argument(
+            "--regularize_step",
+            type=int,
+            default=10000,
+            help="The number of steps between two regularization."
+        )
+
+        self.parser.add_argument(
             "--alpha",
             type=float,
             default=1,

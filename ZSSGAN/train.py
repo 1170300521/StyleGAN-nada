@@ -83,7 +83,7 @@ def train(args):
 
         sample_z = mixing_noise(args.batch, 512, args.mixing, device)
 
-        [sampled_src, sampled_dst], loss = net(sample_z)
+        [sampled_src, sampled_dst], loss = net(sample_z, iter=i+1)
 
         net.zero_grad()
         loss.backward()
