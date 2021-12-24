@@ -64,6 +64,7 @@ class CLIPLoss(torch.nn.Module):
         self.src_text_features = None
         self.target_text_features = None
         self.angle_loss = torch.nn.L1Loss()
+        self.id_loss = DirectionLoss('mse')
 
         self.model_cnn, preprocess_cnn = clip.load("RN50", device=self.device)
         self.preprocess_cnn = transforms.Compose([transforms.Normalize(mean=[-1.0, -1.0, -1.0], std=[2.0, 2.0, 2.0])] + # Un-normalize from [-1.0, 1.0] (GAN output) to [0, 1].
@@ -188,6 +189,22 @@ class CLIPLoss(torch.nn.Module):
         else:
             raise RuntimeError(f"The choice {self.args.supress} is illegal! Please choose it among 0, 1, 2.")
 
+    def keep_normal_features(self, vec):
+        '''
+        Keep normal features of the given vector based on original StyleGAN
+        '''
+        if self.args.supress == 0:
+            return vec * 0
+        elif self.args.supress == 1:
+            return vec * (1 - self.condition)
+        elif self.args.supress == 2:
+            if self.clip_mean is not None:
+                vec = vec - self.clip_mean
+            vec_pca = vec @ self.pca_components.t()
+            return vec_pca * (1 - self.condition)
+        else:
+            raise RuntimeError(f"The choice {self.args.supress} is illegal! Please choose it among 0, 1, 2.")
+
     def compute_text_direction(self, source_class: str, target_class: str) -> torch.Tensor:
         source_features = self.get_text_features(source_class)
         target_features = self.get_text_features(target_class)
@@ -261,11 +278,14 @@ class CLIPLoss(torch.nn.Module):
         if self.target_direction is None:
             self.target_direction = self.compute_text_direction(source_class, target_class)
 
-        src_encoding    = self.get_image_features(src_img)
-        target_encoding = self.get_image_features(target_img)
+        if self.args.use_mean:
+            src_encoding = self.clip_mean
+        else:
+            src_encoding    = self.get_image_features(src_img)
+        src_encoding = self.supress_normal_features(src_encoding, is_target=True)
 
-        src_encoding = self.supress_normal_features(src_encoding)
-        target_encoding = self.supress_normal_features(target_encoding)
+        target_encoding = self.get_image_features(target_img)
+        target_encoding = self.supress_normal_features(target_encoding, is_target=True)
 
         edit_direction = (target_encoding - src_encoding)
         edit_direction /= edit_direction.clone().norm(dim=-1, keepdim=True)
@@ -384,6 +404,15 @@ class CLIPLoss(torch.nn.Module):
 
         return self.texture_loss(src_features, target_features)
 
+    def keep_normal_loss(self, src_img: torch.Tensor, target_img: torch.Tensor) -> torch.Tensor:
+        src_encoding    = self.get_image_features(src_img)
+        src_encoding = self.keep_normal_features(src_encoding)
+
+        target_encoding = self.get_image_features(target_img)
+        target_encoding = self.keep_normal_features(target_encoding)
+
+        return self.id_loss(src_encoding, target_encoding)
+
     def forward(self, src_img: torch.Tensor, source_class: str, target_img: torch.Tensor, target_class: str, texture_image: torch.Tensor = None):
         clip_loss = 0.0
 
@@ -403,4 +432,6 @@ class CLIPLoss(torch.nn.Module):
         if self.lambda_texture:
             # clip_loss += self.lambda_texture * self.cnn_feature_loss(texture_image, target_img)
             clip_loss += self.lambda_texture * self.cnn_feature_loss(src_img, target_img)
+        if self.args.lambda_keep:
+            clip_loss += self.args.lambda_keep * self.keep_normal_loss(src_img, target_img)
         return clip_loss

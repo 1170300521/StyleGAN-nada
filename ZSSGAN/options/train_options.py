@@ -51,6 +51,13 @@ class TrainOptions(object):
         )
 
         self.parser.add_argument(
+            "--lambda_keep",
+            type=float,
+            default=0,
+            help="Strength of keep normal identity loss",
+        )
+
+        self.parser.add_argument(
             "--regularize_step",
             type=int,
             default=10000,
@@ -83,6 +90,12 @@ class TrainOptions(object):
             type=int,
             default=None,
             help="The number of dimensions used for PCA, and None reps using all dimensions"
+        )
+
+        self.parser.add_argument(
+            "--use_mean",
+            action="store_true",
+            help="Whether to use mean vectors for source image."
         )
 
         ######################################################################################################
