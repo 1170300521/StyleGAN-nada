@@ -216,6 +216,7 @@ class CLIPLoss(torch.nn.Module):
         target_features = self.supress_normal_features(target_features, is_target=True)
         source_features = self.supress_normal_features(source_features, is_target=True)
 
+        source_features = 0
         text_direction = (target_features - source_features).mean(axis=0, keepdim=True)
         # text_direction = target_features.mean(axis=0, keepdim=True)
         text_direction /= text_direction.norm(dim=-1, keepdim=True)

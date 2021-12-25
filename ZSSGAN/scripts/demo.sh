@@ -14,17 +14,17 @@
 #                --mixing 0.0 \
 #                --save_interval 150 \
 # ffhq: 1024; cat: 512; dog: 512; church: 256; horse: 256; car: 512, crop_for_cars 
-CUDA_VISIBLE_DEVICES=1 python train.py  \
+CUDA_VISIBLE_DEVICES=0 python train.py  \
                 --batch 2  --dataset "ffhq" \
-                --n_sample 4 --output_dir "sup_2-a_1.5-pca_dim_256" \
+                --n_sample 4 --output_dir "1_m-sup_2-a_1.5-384" \
                 --lr 0.002 \
                 --frozen_gen_ckpt ../weights/stylegan2-ffhq-config-f.pt \
-                --iter 301 \
+                --iter 501 \
                 --source_class "photo" \
-                --target_class "Van Goph painting" \
-                --alpha 0 \
+                --target_class "Painting in the style of Miyazaki Hayao" \
+                --alpha 1.5 \
                 --supress 2 \
-                --pca_dim 256 \
+                --pca_dim 384 \
                 --auto_layer_k 18 \
                 --auto_layer_iters 0 --auto_layer_batch 8 \
                 --output_interval 50 \
