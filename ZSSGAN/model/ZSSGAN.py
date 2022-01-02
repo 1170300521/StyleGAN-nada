@@ -192,9 +192,19 @@ class ZSSGAN(torch.nn.Module):
 
         self.auto_layer_k     = args.auto_layer_k
         self.auto_layer_iters = args.auto_layer_iters
-        
+
         if args.target_img_list is not None:
-            self.set_img2img_direction()
+            if args.source_img_list is not None:
+                self.set_corresponding_img2img_direction()
+            else:
+                self.set_img2img_direction()
+
+    def set_corresponding_img2img_direction(self):
+        with torch.no_grad():
+            for _, model in self.clip_loss_models.items():
+                direction = model.compute_corresponding_img2img_direction(self.args.source_img_list, self.args.target_img_list)
+                model.target_direction = direction
+                print("Set corresponding img2img direction")
 
     def set_img2img_direction(self):
         with torch.no_grad():
@@ -282,6 +292,8 @@ class ZSSGAN(torch.nn.Module):
             else:
                 w_styles = self.generator_frozen.style(styles)
             
+            if self.args.return_w_only:
+                return w_styles
             frozen_img = self.generator_frozen(w_styles, input_is_latent=True, truncation=truncation, randomize_noise=randomize_noise)[0]
 
         trainable_img = self.generator_trainable(w_styles, input_is_latent=True, truncation=truncation, randomize_noise=randomize_noise)[0]

@@ -13,11 +13,11 @@
 #                --clip_model_weights 1.0 1.0 \
 #                --mixing 0.0 \
 #                --save_interval 150 \
-CUDA_VISIBLE_DEVICES=7 python test.py --size 1024 \
+CUDA_VISIBLE_DEVICES=0 python test.py --size 1024 \
                 --batch 2 \
                 --n_sample 4 --output_dir ../results/ffhq/sketch \
                 --lr 0.002 \
-                --frozen_gen_ckpt /data/yb/StyleGAN-nada/results/ffhq/sketch/checkpoint/000150.pt \
+                --frozen_gen_ckpt /home/ybyb/CODE/StyleGAN-nada/results/demo_ffhq/photo+Anime/1_m-sup_2-a_0-512/checkpoint/000300.pt \
                 --iter 301 \
                 --source_class "photo" \
                 --target_class "sketch" \

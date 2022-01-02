@@ -98,6 +98,12 @@ class TrainOptions(object):
             help="Whether to use mean vectors for source image."
         )
 
+        self.parser.add_argument(
+            "--return_w_only",
+            action="store_true",
+            help="Return w codes only for GAN when set true."
+        )
+
         ######################################################################################################
         # Non direction losses are unused in the paper. They are left here for those who want to experiment. #
         ######################################################################################################
@@ -236,6 +242,12 @@ class TrainOptions(object):
         )
 
         self.parser.add_argument(
+            "--style_img_dir_src",
+            type=str,
+            help="Path to a directory containing images (png, jpg or jpeg) without a specific style to mimic"
+        )
+
+        self.parser.add_argument(
             "--img2img_batch",
             type=int,
             default=16,
@@ -359,5 +371,6 @@ class TrainOptions(object):
         opts.train_gen_ckpt = opts.train_gen_ckpt or opts.frozen_gen_ckpt
 
         opts.target_img_list = get_dir_img_list(opts.style_img_dir) if opts.style_img_dir else None
+        opts.source_img_list = get_dir_img_list(opts.style_img_dir_src) if opts.style_img_dir_src else None 
 
         return opts

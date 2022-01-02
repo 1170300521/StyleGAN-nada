@@ -14,22 +14,22 @@
 #                --mixing 0.0 \
 #                --save_interval 150 \
 # ffhq: 1024; cat: 512; dog: 512; church: 256; horse: 256; car: 512, crop_for_cars 
-CUDA_VISIBLE_DEVICES=0 python train.py  \
+CUDA_VISIBLE_DEVICES=1 python train.py  \
                 --batch 2  --dataset "ffhq" \
-                --n_sample 4 --output_dir "1_m-sup_2-a_1.5-384" \
+                --n_sample 4 --output_dir "1_m-sup_2-a_0-512-mean_img" \
                 --lr 0.002 \
                 --frozen_gen_ckpt ../weights/stylegan2-ffhq-config-f.pt \
                 --iter 501 \
                 --source_class "photo" \
-                --target_class "Painting in the style of Miyazaki Hayao" \
-                --alpha 1.5 \
+                --target_class "Anime" \
+                --alpha 0.0 \
                 --supress 2 \
-                --pca_dim 384 \
+                --pca_dim 512 \
                 --auto_layer_k 18 \
                 --auto_layer_iters 0 --auto_layer_batch 8 \
                 --output_interval 50 \
                 --mixing 0.0 \
-                --save_interval 1500 \
+                --save_interval 300 \
                 --clip_models "ViT-B/32" \
                 --clip_model_weights 1.0 \
                 --lambda_direction 1.0 \
@@ -39,6 +39,8 @@ CUDA_VISIBLE_DEVICES=0 python train.py  \
                 --lambda_across 1 \
                 --lambda_keep 0.0 \
                 --regularize_step 50000 \
+                # --style_img_dir ../results/demo_ffhq/photo+Anime/1_m-sup_2-a_0-512/dst_000000.jpg \
+                # --style_img_dir_src ../results/demo_ffhq/photo+Anime/1_m-sup_2-a_0-512/src_000000.jpg
 #                --use_mean \
 #                --style_img_dir ../img/aligned/028_681_722_4k_cameron-mark-zoia_00.png
 		#--mixing 0.9

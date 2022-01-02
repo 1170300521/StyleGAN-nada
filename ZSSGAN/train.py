@@ -108,6 +108,11 @@ def train(args):
 
                 if SAVE_DST:
                     save_images(sampled_dst, sample_dir, "dst", grid_rows, i)
+                avg_image = net(net.generator_frozen.mean_latent.unsqueeze(0),
+                    input_is_latent=True,
+                    randomize_noise=False,
+                    return_latents=False,)[0]
+                save_images(avg_image[1], sample_dir, "mean_w", 1, i)
 
         if (args.save_interval is not None) and (i > 0) and (i % args.save_interval == 0):
             torch.save(

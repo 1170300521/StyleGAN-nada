@@ -63,10 +63,9 @@ def get_samples(args, n_samples=10000):
     '''
     # Set up output directories.
     desc = args.source_class.replace(" ", '_') + "+" + args.target_class.replace(" ", "_")
-    prefix = f"supress_src_{args.supress_src}-alpha_{args.alpha}"
-    if args.enhance:
-        prefix = "enhance-" + prefix
-    args.output_dir = os.path.join("../results", args.dataset, desc, prefix)
+    # prefix = f"supress_src_{args.supress_src}-alpha_{args.alpha}"
+
+    args.output_dir = os.path.join("../results", args.dataset, desc)
     sample_dir = args.output_dir
     os.makedirs(sample_dir, exist_ok=True)
     # Set up networks, optimizers.
@@ -81,18 +80,53 @@ def get_samples(args, n_samples=10000):
 
     net.eval()
     samples_vec = []
+    w_codes = []
     for i in tqdm(range(n_samples)):
         sample_z = mixing_noise(1, 512, args.mixing, device)
+        if args.return_w_only:
+            w_code = net(sample_z)
+            w_codes.append(w_code[0].detach().cpu().numpy())
+            continue
         [sampled_src, sampled_dst], loss = net(sample_z)
         img_feats = net.clip_loss_models['ViT-B/32'].get_image_features(sampled_src)
         # img_feats = torch.cat([img_feats], dim=0).detach().cpu().numpy()
         img_feats = img_feats.squeeze().detach().cpu().numpy()
         samples_vec.append(img_feats)
-
-    with open(os.path.join(sample_dir, 'samples.pkl'), 'wb') as f:
-        pickle.dump(samples_vec, f)
-        
     
+    if args.return_w_only:
+        w_codes = np.concatenate(w_codes, 0)
+        with open(os.path.join(sample_dir, 'sample_w_codes.pkl'), 'wb') as f:
+            pickle.dump(w_codes, f)
+    else:
+        with open(os.path.join(sample_dir, 'samples.pkl'), 'wb') as f:
+            pickle.dump(samples_vec, f)
+        
+
+def get_avg_image(args):
+    print("Initializing networks...")
+    args.output_dir = os.path.join("../results", "demo_" + args.dataset, \
+        args.source_class.replace(" ", '_') + "+" + args.target_class.replace(" ", "_"), \
+            args.output_dir)
+    os.makedirs(args.output_dir, exist_ok=True)
+    if os.path.exists(os.path.join(args.output_dir, 'checkpoint', '000300.pt')):
+        args.train_gen_ckpt = os.path.join(args.output_dir, 'checkpoint', '000300.pt')
+        print("Use pretrained weights from {}".format(os.path.join(args.output_dir), 'checkpoint', '000300.pt'))
+    net = ZSSGAN(args)
+    avg_image = net(net.generator_frozen.mean_latent.unsqueeze(0),
+                    input_is_latent=True,
+                    randomize_noise=False,
+                    return_latents=False,)[0]
+    save_images(avg_image[0], args.output_dir, 'src', 1, 0)
+    save_images(avg_image[1], args.output_dir, 'dst', 1, 0)
+    src_img_feats = net.clip_loss_models['ViT-B/32'].get_image_features(avg_image[0])
+    # img_feats = torch.cat([img_feats], dim=0).detach().cpu().numpy()
+    src_img_feats = src_img_feats.squeeze().detach().cpu().numpy()
+    tgt_img_feats = net.clip_loss_models['ViT-B/32'].get_image_features(avg_image[1])
+    # img_feats = torch.cat([img_feats], dim=0).detach().cpu().numpy()
+    tgt_img_feats = tgt_img_feats.squeeze().detach().cpu().numpy()
+    with open(os.path.join(args.output_dir, 'mean_w_clip.pkl'), 'wb') as f:
+        pickle.dump([src_img_feats, tgt_img_feats], f)
+
 def visual(args):
 
     # Set up networks, optimizers.
@@ -158,9 +192,9 @@ def visualize_pca_weights(args):
 
 
 def visualize_img_pca_weights(args):
-    args.alpha = 1
+    args.alpha = 1.5
     src_sample_path = '/home/ybyb/CODE/StyleGAN-nada/results/ffhq/samples.pkl'
-    tgt_sample_path = '/home/ybyb/CODE/StyleGAN-nada/results/coco.pkl'
+    tgt_sample_path = '/home/ybyb/CODE/StyleGAN-nada/results/demo_ffhq/photo+Anime/1_m-sup_2-a_0-512/mean_w_clip.pkl'
     # tgt_sample_path = '/home/ybyb/CODE/StyleGAN-nada/results/ffhq/photo+Van_Goph_painting/supress_src_0-alpha_0/samples.pkl'
     with open(src_sample_path, 'rb') as f:
         X = pickle.load(f)
@@ -187,9 +221,9 @@ def visualize_img_pca_weights(args):
     plt.ylabel('value')
     Y_pca = pca.transform(Y)
     np.random.shuffle(Y_pca)
-    for i in range(100):
+    for i in range(2):
         plt.scatter(x, Y_pca[i], s=1)
-    plt.savefig(os.path.join(args.output_dir, "Van_goph_img.jpg"))
+    plt.savefig(os.path.join(args.output_dir, "mean_w.jpg"))
     plt.show()
 
 
@@ -201,11 +235,12 @@ if __name__ == "__main__":
     # target_list = ["Van Goph painting", "Miyazaki Hayao painting", "Fernando Botero painting",\
     #     "3D render in the style of Pixar", "Disney Princess", "White Walker",\
     #         "Sketch", "Anime", "Watercolor art with thick brushstrokes"]
-    target_list = ["Van Goph painting", "Miyazaki Hayao painting", "Sketch"]
+    # target_list = ["Van Goph painting", "Miyazaki Hayao painting", "Sketch"]
     # os.makedirs(args.output_dir, exist_ok=True)
-    for target in target_list:
-        args.target_class = target
-        visualize_pca_weights(args)
+    # for target in target_list:
+    #     args.target_class = target
+    #     visualize_pca_weights(args)
         # get_samples(args)
-    # visualize_img_pca_weights(args)
     
+    get_avg_image(args)
+    visualize_img_pca_weights(args)
