@@ -205,6 +205,15 @@ class CLIPLoss(torch.nn.Module):
         else:
             raise RuntimeError(f"The choice {self.args.supress} is illegal! Please choose it among 0, 1, 2.")
 
+    def get_pca_features(self, vec):
+        '''
+        Convert CLIP features to PCA features
+        '''
+        if self.clip_mean is None:
+            return vec
+        vec = vec - self.clip_mean
+        return vec @ self.pca_components.t()
+
     def compute_text_direction(self, source_class: str, target_class: str) -> torch.Tensor:
         source_features = self.get_text_features(source_class)
         target_features = self.get_text_features(target_class)
@@ -322,7 +331,25 @@ class CLIPLoss(torch.nn.Module):
         edit_direction = (target_encoding - src_encoding)
         edit_direction /= edit_direction.clone().norm(dim=-1, keepdim=True)
         
-        return self.direction_loss(edit_direction, self.target_direction).mean()
+        return self.direction_loss(edit_direction[:, 0:self.args.divide_line], self.target_direction[:, 0:self.args.divide_line]).mean()
+
+    def pca_directional_loss(self, src_img: torch.Tensor, source_class: str, target_img: torch.Tensor, target_class: str) -> torch.Tensor:
+        if self.target_direction is None:
+            self.target_direction = self.compute_text_direction(source_class, target_class)
+
+        # if self.args.use_mean:
+        #     src_encoding = self.clip_mean
+        # else:
+        src_encoding    = self.get_image_features(src_img)
+        src_encoding = self.get_pca_features(src_encoding)
+
+        target_encoding = self.get_image_features(target_img)
+        target_encoding = self.get_pca_features(target_encoding)
+
+        edit_direction = (target_encoding - src_encoding)
+        edit_direction /= edit_direction.clone().norm(dim=-1, keepdim=True)
+        
+        return self.direction_loss(edit_direction[:, self.args.divide_line::], self.target_direction[:, self.args.divide_line::]).mean()
 
     def global_clip_loss(self, img: torch.Tensor, text) -> torch.Tensor:
         if not isinstance(text, list):
@@ -443,7 +470,7 @@ class CLIPLoss(torch.nn.Module):
         target_encoding = self.get_image_features(target_img)
         target_encoding = self.keep_normal_features(target_encoding)
 
-        return self.id_loss(src_encoding, target_encoding)
+        return self.id_loss(src_encoding[:, 0:self.args.divide_line], target_encoding[:, 0:self.args.divide_line])
 
     def forward(self, src_img: torch.Tensor, source_class: str, target_img: torch.Tensor, target_class: str, texture_image: torch.Tensor = None):
         clip_loss = 0.0
@@ -466,4 +493,7 @@ class CLIPLoss(torch.nn.Module):
             clip_loss += self.lambda_texture * self.cnn_feature_loss(src_img, target_img)
         if self.args.lambda_keep:
             clip_loss += self.args.lambda_keep * self.keep_normal_loss(src_img, target_img)
+
+        if self.args.lambda_pca > 0 and self.args.divide_line < 512:
+            clip_loss += self.args.lambda_pca * self.pca_directional_loss(src_img, source_class, target_img, target_class)
         return clip_loss

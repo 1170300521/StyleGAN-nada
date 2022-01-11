@@ -58,6 +58,12 @@ class TrainOptions(object):
         )
 
         self.parser.add_argument(
+            "--lambda_pca",
+            type=float,
+            default=0,
+            help="Strenght of pca directional loss"
+        )
+        self.parser.add_argument(
             "--regularize_step",
             type=int,
             default=10000,
@@ -67,7 +73,7 @@ class TrainOptions(object):
         self.parser.add_argument(
             "--alpha",
             type=float,
-            default=1,
+            default=2,
             help="Coefficient to adjust the degree to supress normal features of the given text"
         )
         
@@ -102,6 +108,20 @@ class TrainOptions(object):
             "--return_w_only",
             action="store_true",
             help="Return w codes only for GAN when set true."
+        )
+
+        self.parser.add_argument(
+            "--divide_line",
+            type=int,
+            default=512,
+            help="The number of dimensions using supression loss"
+        )
+
+        self.parser.add_argument(
+            "--regular_pca_dim",
+            type=int,
+            default=0,
+            help="The number of pca dimensions used during regularization. 0 reps using clip space."
         )
 
         ######################################################################################################

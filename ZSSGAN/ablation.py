@@ -132,9 +132,7 @@ def train(args):
 
 def run_one_experiment(args):
     desc = args.source_class.replace(" ", '_') + "+" + args.target_class.replace(" ", "_")
-    prefix = f"supress_src_{args.supress_src}-alpha_{args.alpha}"
-    if args.enhance:
-        prefix = "enhance-" + prefix
+    prefix = f"supress_src_{args.supress}-alpha_{args.alpha}"
     args.output_dir = os.path.join("../results", args.dataset, desc, prefix)
     os.makedirs(os.path.join(args.output_dir, "code"), exist_ok=True)
     copytree("criteria/", os.path.join(args.output_dir, "code", "criteria"), )
@@ -159,14 +157,13 @@ if __name__ == "__main__":
         'car': 512,
     }
     # save snapshot of code / args before training.
-    # target_list = ["Van Goph painting", "Miyazaki Hayao painting", "Fernando Botero painting",\
-    #     "3D render in the style of Pixar", "Disney Princess", "White Walker",\
-    #         "Sketch", "Anime", "Watercolor art with thick brushstrokes"]
-    target_list = ["Van Goph painting", "Miyazaki Hayao painting", "Sketch"]
+    target_list = ["Van Goph painting", "Miyazaki Hayao painting", "Fernando Botero painting",\
+        "3D render in the style of Pixar", "Disney Princess", "White Walker",\
+            "Sketch", "Anime", "Watercolor art with thick brushstrokes"]
+    # target_list = ["Van Goph painting", "Miyazaki Hayao painting", "Sketch"]
     #alpha_list = [0, 0.5, 1, 1.5, 2]
     alpha_list = [0]
-    enhance_list = [False, True]
-    supress_src_list = [0, 1, 2]
+    supress_src_list = [2]
 
     args.size = dataset_size[args.dataset]
     for target in target_list:
@@ -177,7 +174,5 @@ if __name__ == "__main__":
                 run_one_experiment(args)
             else:
                 for supress_src in supress_src_list:
-                    args.supress_src = supress_src
-                    for enhance in enhance_list:
-                        args.enhance = enhance
-                        run_one_experiment(args)
+                    args.supress = supress_src
+                    run_one_experiment(args)

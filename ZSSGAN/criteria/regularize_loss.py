@@ -1,10 +1,12 @@
 from os import access
+import pickle
 import numpy as np
 
 import torch
 import torch.nn.functional as F
 import torchvision.transforms as transforms
 import clip
+from sklearn.decomposition import PCA
 
 from ZSSGAN.criteria.clip_loss import DirectionLoss
 
@@ -26,7 +28,26 @@ class RegularizeLoss(torch.nn.Module):
         self.lambda_across = lambda_across
         self.within_dist = DirectionLoss(dist_loss_type)
         self.across_dist = DirectionLoss(dist_loss_type)
+        
+        self.clip_mean = None
+        self.pca_components = None
+        self.pca = None
+        if self.args.regular_pca_dim > 0:
+            self.pca = self.get_pca()
 
+    def get_pca(self):
+        orig_sample_path = '../weights/ffhq_samples.pkl'
+        with open(orig_sample_path, 'rb') as f:
+            X = pickle.load(f)
+            X = np.array(X)
+         # Define a pca and train it
+        pca = PCA(n_components=self.args.pca_dim)
+        pca.fit(X)
+        self.clip_mean = torch.from_numpy(pca.mean_).float().to(self.device)
+        self.pca_components = torch.from_numpy(pca.components_).float().to(self.device)
+
+        return pca
+    
     def encode_images(self, images: torch.Tensor) -> torch.Tensor:
         images = self.preprocess(images).to(self.device)
         return self.model.encode_image(images)
@@ -38,13 +59,27 @@ class RegularizeLoss(torch.nn.Module):
             image_features /= image_features.clone().norm(dim=-1, keepdim=True)
 
         return image_features
-     
+    
+    def get_pca_features(self, vec):
+        '''
+        Convert CLIP features to PCA features
+        '''
+        if self.clip_mean is None:
+            return vec
+        vec = vec - self.clip_mean
+        vec = vec @ self.pca_components.t()
+        return vec
+
     def within_loss(self, src_img_a, src_img_b, tgt_img_a, tgt_img_b):
         v_A = src_img_b - src_img_a
         v_B = tgt_img_b - tgt_img_a
 
         v_A /= v_A.clone().norm(dim=-1, keepdim=True)
         v_B /= v_B.clone().norm(dim=-1, keepdim=True)
+
+        if self.args.regular_pca_dim > 0:
+            v_A = self.get_pca_features(v_A)[..., 0:self.args.regular_pca_dim]
+            v_B = self.get_pca_features(v_B)[..., 0:self.args.regular_pca_dim]
 
         return self.within_dist(v_A, v_B).mean()
     
