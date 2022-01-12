@@ -244,12 +244,13 @@ class CLIPLoss(torch.nn.Module):
                 target_encodings.append(encoding)
             
             target_encoding = torch.cat(target_encodings, axis=0)
-            # target_encoding = self.supress_normal_features(target_encoding, is_target=True)
+            target_encoding = self.supress_normal_features(target_encoding, is_target=True)
             target_encoding = target_encoding.mean(dim=0, keepdim=True)
 
             src_encoding = self.get_image_features(source_images)
             src_encoding = src_encoding.mean(dim=0, keepdim=True)
             # src_encoding = self.supress_normal_features(src_encoding, is_target=True)
+            src_encoding = 0
             direction = target_encoding - src_encoding
             direction /= direction.norm(dim=-1, keepdim=True)
 

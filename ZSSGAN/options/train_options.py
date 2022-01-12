@@ -124,6 +124,13 @@ class TrainOptions(object):
             help="The number of pca dimensions used during regularization. 0 reps using clip space."
         )
 
+        self.parser.add_argument(
+            "--begin",
+            type=int,
+            default=0,
+            help="The starting dimension for within regularization loss",
+        )
+
         ######################################################################################################
         # Non direction losses are unused in the paper. They are left here for those who want to experiment. #
         ######################################################################################################

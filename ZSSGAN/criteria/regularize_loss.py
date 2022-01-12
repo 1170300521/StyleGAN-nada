@@ -78,8 +78,8 @@ class RegularizeLoss(torch.nn.Module):
         v_B /= v_B.clone().norm(dim=-1, keepdim=True)
 
         if self.args.regular_pca_dim > 0:
-            v_A = self.get_pca_features(v_A)[..., 0:self.args.regular_pca_dim]
-            v_B = self.get_pca_features(v_B)[..., 0:self.args.regular_pca_dim]
+            v_A = self.get_pca_features(v_A)[..., self.args.begin:self.args.regular_pca_dim]
+            v_B = self.get_pca_features(v_B)[..., self.args.begin:self.args.regular_pca_dim]
 
         return self.within_dist(v_A, v_B).mean()
     
