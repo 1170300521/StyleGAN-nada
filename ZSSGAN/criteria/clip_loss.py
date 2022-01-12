@@ -185,6 +185,9 @@ class CLIPLoss(torch.nn.Module):
             vec_pca = vec @ self.pca_components.t()
             if self.condition is None:
                 self.condition = (vec_pca[0].abs() > self.pca_threshold).unsqueeze(0).float()
+#                self.condition = torch.zeros_like(vec[0]).unsqueeze(0)
+#                self.condition[:, self.args.begin:self.args.regular_pca_dim] = 1
+            
             return vec_pca * self.condition if is_target else vec_pca
         else:
             raise RuntimeError(f"The choice {self.args.supress} is illegal! Please choose it among 0, 1, 2.")
@@ -215,7 +218,7 @@ class CLIPLoss(torch.nn.Module):
         return vec @ self.pca_components.t()
 
     def compute_text_direction(self, source_class: str, target_class: str) -> torch.Tensor:
-        source_features = self.get_text_features(source_class)
+        source_features = self.clip_mean
         target_features = self.get_text_features(target_class)
         
         # Remove info similar to StyleGAN
@@ -225,7 +228,7 @@ class CLIPLoss(torch.nn.Module):
         target_features = self.supress_normal_features(target_features, is_target=True)
         source_features = self.supress_normal_features(source_features, is_target=True)
 
-        source_features = 0
+        # source_features = 0
         text_direction = (target_features - source_features).mean(axis=0, keepdim=True)
         # text_direction = target_features.mean(axis=0, keepdim=True)
         text_direction /= text_direction.norm(dim=-1, keepdim=True)
