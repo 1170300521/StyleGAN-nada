@@ -193,12 +193,27 @@ def visualize_pca_weights(args):
 
 def visualize_img_pca_weights(args):
     args.alpha = 1.5
+    clip_loss = CLIPLoss('cuda', 
+                        lambda_direction=args.lambda_direction, 
+                        lambda_patch=args.lambda_patch, 
+                        lambda_global=args.lambda_global, 
+                        lambda_manifold=args.lambda_manifold, 
+                        lambda_texture=args.lambda_texture,
+                        clip_model=args.clip_models[0],
+                        args=args)
+    if args.style_img_dir is not None:
+        text = clip_loss.get_raw_img_features(args.style_img_dir).detach().cpu().numpy()
+    else:
+        text = clip_loss.get_text_features(args.target_class).cpu().numpy()
     src_sample_path = '/home/ybyb/CODE/StyleGAN-nada/results/ffhq/samples.pkl'
     tgt_sample_path = '/home/ybyb/CODE/StyleGAN-nada/results/demo_ffhq/photo+Anime/1_m-sup_2-a_0-512/mean_w_clip.pkl'
+    tgt_sample_path = src_sample_path
     # tgt_sample_path = '/home/ybyb/CODE/StyleGAN-nada/results/ffhq/photo+Van_Goph_painting/supress_src_0-alpha_0/samples.pkl'
     with open(src_sample_path, 'rb') as f:
         X = pickle.load(f)
         X = np.array(X)
+        std = np.std(X, axis=0)
+        max_ids = np.argsort(std)[482:512]
         # Define a pca and train it
     pca = PCA(n_components=512)
     pca.fit(X)
@@ -213,17 +228,20 @@ def visualize_img_pca_weights(args):
     # Get the standar deviation of samples and set threshold for each dimension
     threshold = np.sqrt(pca.explained_variance_) * args.alpha
     x = np.arange(len(threshold))
-    l1 = plt.plot(x, threshold, 'r', label='pos_threshold')
-    l2 = plt.plot(x, -threshold, 'r', label='neg_threshold')
+#    l1 = plt.plot(x, threshold, 'r', label='pos_threshold')
+#    l2 = plt.plot(x, -threshold, 'r', label='neg_threshold')
     plt.legend()
     plt.ylim(-0.3, 0.3)
     plt.xlabel('dimension')
     plt.ylabel('value')
-    Y_pca = pca.transform(Y)
+    # Y_pca = pca.transform(Y)
+    Y_pca = Y
     np.random.shuffle(Y_pca)
-    for i in range(2):
+    for i in range(100):
         plt.scatter(x, Y_pca[i], s=1)
-    plt.savefig(os.path.join(args.output_dir, "mean_w.jpg"))
+    plt.scatter(x, text[0], marker="+")
+    plt.scatter(max_ids, np.zeros(len(max_ids))+0.25, marker="o")
+    plt.savefig(os.path.join(args.output_dir, "clip_space.jpg"))
     plt.show()
 
 
@@ -242,5 +260,5 @@ if __name__ == "__main__":
     #     visualize_pca_weights(args)
         # get_samples(args)
     
-    get_avg_image(args)
+    # get_avg_image(args)
     visualize_img_pca_weights(args)

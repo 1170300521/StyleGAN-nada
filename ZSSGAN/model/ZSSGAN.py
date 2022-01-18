@@ -275,7 +275,10 @@ class ZSSGAN(torch.nn.Module):
         randomize_noise=True,
         iter=1,
     ):
-
+        import pdb
+        pdb.set_trace()
+        print(1)
+        args.return_w_only=False
         if self.training and self.auto_layer_iters > 0:
             self.generator_trainable.unfreeze_layers()
             train_layers = self.determine_opt_layers()
@@ -285,15 +288,18 @@ class ZSSGAN(torch.nn.Module):
 
             self.generator_trainable.freeze_layers()
             self.generator_trainable.unfreeze_layers(train_layers)
-
+        
         with torch.no_grad():
             if input_is_latent:
                 w_styles = styles
             else:
-                w_styles = self.generator_frozen.style(styles)
+                w_styles = self.generator_frozen.style(styles)+torch.tensor(np.load("boundaries/stylegan_ffhq_smile_w_boundary.npy"))
             
             if self.args.return_w_only:
+                
+                
                 return w_styles
+            
             frozen_img = self.generator_frozen(w_styles, input_is_latent=True, truncation=truncation, randomize_noise=randomize_noise)[0]
 
         trainable_img = self.generator_trainable(w_styles, input_is_latent=True, truncation=truncation, randomize_noise=randomize_noise)[0]
@@ -304,6 +310,8 @@ class ZSSGAN(torch.nn.Module):
             iter % self.args.regularize_step == 0:
             clip_loss += self.regularize_loss(frozen_img, trainable_img)
             print("Regularize at step {}!".format(iter))
+        
+        
         return [frozen_img, trainable_img], clip_loss
 
     def pivot(self):

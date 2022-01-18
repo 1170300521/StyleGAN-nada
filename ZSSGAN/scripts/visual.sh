@@ -13,4 +13,5 @@ CUDA_VISIBLE_DEVICES=0 python visual.py --size 1024 \
                 --save_interval 150 \
                 --clip_models "ViT-B/32" \
                 --clip_model_weights 1.0 \
-                --return_w_only \
+                
+                
