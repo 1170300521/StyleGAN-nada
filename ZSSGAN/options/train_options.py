@@ -77,6 +77,12 @@ class TrainOptions(object):
             help="Coefficient to adjust the degree to supress normal features of the given text"
         )
         
+        self.parser.add_argument(
+            "--clip_num_alpha",
+            type=float,
+            default=0,
+            help="The coefficient that controls how many dimensions are related to original domain."
+        )
         # self.parser.add_argument(
         #     "--enhance",
         #     action="store_true",

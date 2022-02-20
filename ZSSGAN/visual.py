@@ -30,6 +30,7 @@ Example commands:
 import argparse
 from math import pi
 import os
+from turtle import pd
 import numpy as np
 
 import torch
@@ -44,6 +45,7 @@ import json
 import pickle
 import matplotlib.pyplot as plt
 from sklearn.decomposition import PCA
+from sklearn.mixture import GaussianMixture
 
 from utils.file_utils import copytree, save_images, save_paper_image_grid
 from utils.training_utils import mixing_noise
@@ -89,6 +91,7 @@ def get_samples(args, n_samples=10000):
             continue
         [sampled_src, sampled_dst], loss = net(sample_z)
         img_feats = net.clip_loss_models['ViT-B/32'].get_image_features(sampled_src)
+        save_images(sampled_src, args.output_dir, 'sample', 1, i)
         # img_feats = torch.cat([img_feats], dim=0).detach().cpu().numpy()
         img_feats = img_feats.squeeze().detach().cpu().numpy()
         samples_vec.append(img_feats)
@@ -134,7 +137,7 @@ def visual(args):
     net = ZSSGAN(args)
 
     # Set up output directories.
-    sample_dir = os.path.join(args.output_dir, "vis_sample")
+    sample_dir = os.path.join(args.output_dir, "samples")
 
     os.makedirs(sample_dir, exist_ok=True)
 
@@ -143,23 +146,21 @@ def visual(args):
     np.random.seed(2)
 
     # Training loop
-    fixed_z = torch.randn(args.n_sample, 512, device=device)
-
     net.eval()
+    for i in range(10):
+        with torch.no_grad():
+            fixed_z = torch.randn(1, 512, device=device)
+            [sampled_src, sampled_dst], loss = net([fixed_z], truncation=args.sample_truncation)
+            if args.crop_for_cars:
+                sampled_dst = sampled_dst[:, :, 64:448, :]
 
-    with torch.no_grad():
-        [sampled_src, sampled_dst], loss = net([fixed_z], truncation=args.sample_truncation)
+            grid_rows = 1
 
-        if args.crop_for_cars:
-            sampled_dst = sampled_dst[:, :, 64:448, :]
+            if SAVE_SRC:
+                save_images(sampled_src, sample_dir, "src", grid_rows, i)
 
-        grid_rows = int(args.n_sample ** 0.5)
-
-        if SAVE_SRC:
-            save_images(sampled_src, sample_dir, "src", grid_rows, 0)
-
-        if SAVE_DST:
-            save_images(sampled_dst, sample_dir, "dst", grid_rows, 0)
+            if SAVE_DST:
+                save_images(sampled_dst, sample_dir, "dst", grid_rows, i)
      
 
 def visualize_pca_weights(args):
@@ -190,7 +191,68 @@ def visualize_pca_weights(args):
     plt.savefig(os.path.join(args.output_dir, args.target_class.replace(" ", '_') + ".jpg"))
     plt.show()
 
+def embedding_pair_imgs(img_dir):
+    src_sample_path = '/home/ybyb/CODE/StyleGAN-nada/results/ffhq/samples.pkl'
+    with open(src_sample_path, 'rb') as f:
+        X = pickle.load(f)
+        X = np.array(X)
+        std = np.std(X, axis=0)
+        max_ids = np.argsort(std)[482:512]
+        dist = np.max(X, axis=0) - np.min(X, axis=0)
+    pca = PCA(n_components=512)
+    pca.fit(X)
 
+    clip_loss = CLIPLoss('cuda', 
+                        lambda_direction=args.lambda_direction, 
+                        lambda_patch=args.lambda_patch, 
+                        lambda_global=args.lambda_global, 
+                        lambda_manifold=args.lambda_manifold, 
+                        lambda_texture=args.lambda_texture,
+                        clip_model=args.clip_models[0],
+                        args=args)
+    special_dims = set(range(0, 512))
+    for i in range(1, 4):
+        orig_vec = clip_loss.get_raw_img_features(os.path.join(img_dir, f"{i}.png")).detach().cpu().numpy()
+        mod_vec = clip_loss.get_raw_img_features(os.path.join(img_dir, f"{i}{i}.png")).detach().cpu().numpy()
+        # orig_vec = pca.transform(orig_vec)
+        # mod_vec = pca.transform(mod_vec)
+        sub = np.abs(mod_vec - orig_vec)[0]
+        sub[sub <= std * 2] = 0
+        # sub[sub <= np.sqrt(pca.explained_variance_) * 2] = 0
+        x = np.arange(len(sub))
+        plt.ylim(-0.3, 0.3)
+        plt.xlabel('dimension')
+        plt.ylabel('value')
+        # plt.scatter(max_ids, np.zeros(len(max_ids))+0.25, c='b', marker="o")
+        # plt.scatter(x, orig_vec, c='r', s=1)
+        # plt.scatter(x, mod_vec, c='g', marker='+', s=1)
+        plt.scatter(x, sub, c='g', marker='+')
+        plt.plot(x, x-x, c='r')
+        
+        plt.show()
+
+def find_most_similar_imgs(args):
+    src_sample_path = '../results/ffhq/photo+Original_samples/samples.pkl'
+    clip_loss = CLIPLoss('cuda', 
+                        lambda_direction=args.lambda_direction, 
+                        lambda_patch=args.lambda_patch, 
+                        lambda_global=args.lambda_global, 
+                        lambda_manifold=args.lambda_manifold, 
+                        lambda_texture=args.lambda_texture,
+                        clip_model=args.clip_models[0],
+                        args=args)
+    with open(src_sample_path, 'rb') as f:
+        X = pickle.load(f)
+        X = np.array(X)
+    if args.style_img_dir is not None:
+        text = clip_loss.get_raw_img_features(args.style_img_dir).detach().cpu().numpy()[0]
+    else:
+        text = clip_loss.get_text_features(args.target_class).cpu().numpy()[0]
+    sim = np.dot(X, text)
+    orders = np.argsort(sim)[::-1]
+    print(orders[0:20])
+    print(sim[orders[0:20]])
+    
 def visualize_img_pca_weights(args):
     args.alpha = 1.5
     clip_loss = CLIPLoss('cuda', 
@@ -217,6 +279,14 @@ def visualize_img_pca_weights(args):
         # Define a pca and train it
     pca = PCA(n_components=512)
     pca.fit(X)
+
+    # Define a GMM and fit it
+    gm = GaussianMixture(n_components=10)
+    orders = np.argsort(std)[::-1][0:50]
+    gm_x = X[:, orders]
+    gm.fit(gm_x)
+    import pdb
+    pdb.set_trace()
 
     if src_sample_path == tgt_sample_path:
         Y = X
@@ -261,4 +331,7 @@ if __name__ == "__main__":
         # get_samples(args)
     
     # get_avg_image(args)
-    visualize_img_pca_weights(args)
+    # visualize_img_pca_weights(args)
+    # embedding_pair_imgs("/home/ybyb/yms/emo/open")
+    find_most_similar_imgs(args)
+    

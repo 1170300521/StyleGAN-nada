@@ -70,18 +70,22 @@ class RegularizeLoss(torch.nn.Module):
         vec = vec @ self.pca_components.t()
         return vec
 
-    def within_loss(self, src_img_a, src_img_b, tgt_img_a, tgt_img_b):
+    def within_loss(self, src_img_a, src_img_b, tgt_img_a, tgt_img_b, condition=None):
         v_A = src_img_b - src_img_a
         v_B = tgt_img_b - tgt_img_a
-
+        
         v_A /= v_A.clone().norm(dim=-1, keepdim=True)
         v_B /= v_B.clone().norm(dim=-1, keepdim=True)
 
-        if self.args.regular_pca_dim > 0:
-            v_A = self.get_pca_features(v_A)[..., self.args.begin:self.args.regular_pca_dim]
-            v_B = self.get_pca_features(v_B)[..., self.args.begin:self.args.regular_pca_dim]
+        if condition is not None:
+            v_A = v_A * (1 - condition)
+            v_B = v_B * (1 - condition)
+        # if self.args.regular_pca_dim > 0:
+            # v_A = self.get_pca_features(v_A)[..., self.args.begin:self.args.regular_pca_dim]
+            # v_B = self.get_pca_features(v_B)[..., self.args.begin:self.args.regular_pca_dim]
 
-        return self.within_dist(v_A, v_B).mean()
+        return self.within_dist(v_A, v_B).mean() * (1 - condition.sum() / 512)
+        # return self.within_dist(v_A, v_B).mean()
     
     def across_loss(self, src_img_a, src_img_b, tgt_img_a, tgt_img_b):
         v_ref = tgt_img_a - src_img_a
@@ -92,7 +96,7 @@ class RegularizeLoss(torch.nn.Module):
 
         return self.across_dist(v_ref, v_samp).mean()
 
-    def forward(self, src_imgs, tgt_imgs):
+    def forward(self, src_imgs, tgt_imgs, condition=None):
         regular_loss = 0.0
         src_encodings = self.get_image_features(src_imgs)
         tgt_encodings = self.get_image_features(tgt_imgs)
@@ -102,5 +106,5 @@ class RegularizeLoss(torch.nn.Module):
                 tgt_encodings[0:1], tgt_encodings[1:])
         if self.lambda_within:
             regular_loss += self.lambda_within * self.within_loss(src_encodings[0:1], src_encodings[1:],\
-                tgt_encodings[0:1], tgt_encodings[1:])
+                tgt_encodings[0:1], tgt_encodings[1:], condition=condition)
         return regular_loss

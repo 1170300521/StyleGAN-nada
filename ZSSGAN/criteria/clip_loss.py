@@ -80,11 +80,26 @@ class CLIPLoss(torch.nn.Module):
         self.pca = self.get_pca()
 
     def get_pca(self):
-        orig_sample_path = '../weights/ffhq_samples.pkl'
+        orig_sample_path = '../weights/samples.pkl'
         with open(orig_sample_path, 'rb') as f:
             X = pickle.load(f)
             X = np.array(X)
-            self.clip_threshold = torch.from_numpy(np.std(X, axis=0)).float().to(self.device) * self.alpha
+        self.samples = X
+        self.clip_mean = torch.from_numpy(np.mean(X, axis=0)).float().to(self.device)
+        if self.args.supress == 1:    
+            std = np.std(X, axis=0)
+            self.clip_threshold = torch.from_numpy(std).float().to(self.device) * self.alpha
+            # Get effective dimensions different from origional domain
+            self.condition = (std <= (std.mean() * self.args.clip_num_alpha))
+            print("The number of style dimensions: ", self.condition.sum())
+            # self.condition = torch.from_numpy(self.condition).float().to(self.device)
+
+        # with open("../results/ffhq/clip_orders.pkl",'rb') as f:
+        #     orders = pickle.load(f)[0:30]
+        #     np.random.shuffle(orders)
+        #     self.condition = torch.ones(512)
+        #     self.condition[orders] = 0
+        #     self.condition = self.condition.to(self.device).unsqueeze(0)
         
         # Define a pca and train it
         pca = PCA(n_components=self.args.pca_dim)
@@ -93,7 +108,6 @@ class CLIPLoss(torch.nn.Module):
         # Get the standar deviation of samples and set threshold for each dimension
         threshold = np.sqrt(pca.explained_variance_) * self.alpha
         self.pca_threshold = torch.from_numpy(threshold).float().to(self.device)
-        self.clip_mean = torch.from_numpy(pca.mean_).float().to(self.device)
         self.pca_components = torch.from_numpy(pca.components_).float().to(self.device)
 
         # if self.args.enhance:
@@ -143,34 +157,16 @@ class CLIPLoss(torch.nn.Module):
 
         return image_features
 
-    def interact_with_gan(self, vec, n_components=256, keep_first=True):
-        '''
-        Interact information with stylegan to keep or remove some bias.
-        '''
-        gan_sample_path = '../weights/ffhq_samples.pkl'
-        # Read samples from file
-        with open(gan_sample_path, 'rb') as f:
-            X = pickle.load(f)
-            X = np.array(X)
-        
-        # Define a PCA and train it
-        pca = PCA(n_components=n_components)
-        pca.fit(X)
-
-        # Reduce dim of vec so that info related to stylegan is keeped.
-        vec_trans = pca.transform(vec.cpu().numpy())
-        vec_inv = pca.inverse_transform(vec_trans)
-
-        with open("../results/ffhq/clip_orders.pkl",'rb') as f:
-            orders = pickle.load(f)[0:50]
-            self.condition = torch.ones(512)
-            self.condition[orders] = 0
-            self.condition = self.condition.to(vec.device).unsqueeze(0)
-
-        if keep_first:
-            return torch.from_numpy(vec_inv).to(vec.device)
-        else:
-            return vec - torch.from_numpy(vec_inv).to(vec.device)
+    def get_similar_img(self, tgt_vec):
+        tgt = tgt_vec[0].cpu().numpy()
+        sim = np.dot(self.samples, tgt)
+        orders = np.argsort(sim)[::-1]
+        print("Orders: {}, Similarities: {}".format(orders[0:20], sim[orders[0:20]]))
+        src = self.samples[orders[0:1]]
+        src = src * sim[orders[0:1], None]
+        src = torch.from_numpy(src).to(tgt_vec.device, dtype=tgt_vec.dtype).mean(axis=0, keepdim=True)
+        # src /= src.norm(dim=-1, keepdim=True)
+        return src
 
     def supress_normal_features(self, vec, is_target=False):
         '''
@@ -182,9 +178,16 @@ class CLIPLoss(torch.nn.Module):
         if self.args.supress == 0:
             return vec
         elif self.args.supress == 1:
-            if self.condition is None:
-                self.condition = ((vec[0].abs() - self.clip_mean) > self.clip_threshold).unsqueeze(0).float()
-            return vec * self.condition if is_target else vec
+            if self.condition is None or isinstance(self.condition, np.ndarray):
+#                tmp = ((vec[0] - self.clip_mean).abs() / (self.clip_threshold + 1e-8)).cpu().numpy()
+#                tmp[tmp > 1] = 1
+#                tmp = tmp * (1 - self.condition)
+#                self.condition = self.condition + tmp
+                self.condition = torch.from_numpy(self.condition).unsqueeze(0).float().to(vec.device)
+                print("The number of style and special attrs: ", self.condition.sum())
+            #     self.condition = ((vec[0].abs() - self.clip_mean) > self.clip_threshold).unsqueeze(0).float()
+            # return vec * self.condition if is_target else vec
+            return vec
         elif self.args.supress == 2:
             if self.clip_mean is not None:
                 vec = vec - self.clip_mean
@@ -227,13 +230,12 @@ class CLIPLoss(torch.nn.Module):
     def compute_text_direction(self, source_class: str, target_class: str) -> torch.Tensor:
         source_features = self.clip_mean
         target_features = self.get_text_features(target_class)
-        
-        # Remove info similar to StyleGAN
-        # target_features = self.interact_with_gan(target_features, n_components=16, keep_first=False)
+        # source_features = self.get_similar_img(target_features)
+        self.similar_imgs = self.get_similar_img(target_features)
         
         # Supress normal features and keep special features in the text feature
-        target_features = self.supress_normal_features(target_features, is_target=False)
-        source_features = self.supress_normal_features(source_features, is_target=False)
+        target_features = self.supress_normal_features(target_features, is_target=True)
+        source_features = self.supress_normal_features(source_features, is_target=True)
 
         # source_features = 0
         text_direction = (target_features - source_features).mean(axis=0, keepdim=True)
@@ -265,7 +267,11 @@ class CLIPLoss(torch.nn.Module):
 
 #            src_encoding = self.get_image_features(source_images)
 #            src_encoding = src_encoding.mean(dim=0, keepdim=True)
-            src_encoding = self.supress_normal_features(self.clip_mean, is_target=True)
+            # src_encoding = self.get_similar_img(target_encoding)
+            # src_encoding = self.get_similar_img(target_encoding)
+            self.similar_imgs = self.get_similar_img(target_encoding)
+            src_encoding = self.clip_mean
+            src_encoding = self.supress_normal_features(src_encoding, is_target=True)
             # src_encoding = 0
             direction = target_encoding - src_encoding
             direction /= direction.norm(dim=-1, keepdim=True)
@@ -340,10 +346,10 @@ class CLIPLoss(torch.nn.Module):
             src_encoding = self.clip_mean
         else:
             src_encoding    = self.get_image_features(src_img)
-        src_encoding = self.supress_normal_features(src_encoding, is_target=False)
+        src_encoding = self.supress_normal_features(src_encoding, is_target=True)
 
         target_encoding = self.get_image_features(target_img)
-        target_encoding = self.supress_normal_features(target_encoding, is_target=False)
+        target_encoding = self.supress_normal_features(target_encoding, is_target=True)
 
         edit_direction = (target_encoding - src_encoding)
         edit_direction /= edit_direction.clone().norm(dim=-1, keepdim=True)
@@ -490,6 +496,22 @@ class CLIPLoss(torch.nn.Module):
         return self.id_loss(src_encoding[:, 0:self.args.divide_line], target_encoding[:, 0:self.args.divide_line]).mean()
 #        return self.id_loss(src_encoding[:, self.args.begin:self.args.regular_pca_dim], target_encoding[:, self.args.begin:self.args.regular_pca_dim]).mean()
 
+    def remove_similar_loss(self, src_img, target_img):
+        target_encoding = self.get_image_features(target_img)
+        src_encoding = self.get_image_features(src_img)
+        batch, d = target_encoding.shape
+        num, d = self.similar_imgs.shape
+#        target_encoding = target_encoding.unsqueeze(1).repeat(1, num, 1)
+#        src_encoding = src_encoding.unsqueeze(1).repeat(1, num, 1)
+#        sim_imgs = self.similar_imgs.unsqueeze(0).repeat(batch, 1, 1)
+        #d1 = F.cosine_similarity(src_encoding, sim_imgs, dim=-1) 
+        #d2 = F.cosine_similarity(target_encoding, sim_imgs, dim=-1)
+        #return F.mse_loss(d1, d2)
+        sim_imgs = self.similar_imgs.mean(axis=0, keepdim=True)
+        return F.cosine_similarity(target_encoding, sim_imgs, dim=-1)
+        # sim_imgs /= sim_imgs.norm(dim=-1, keepdim=True)
+        # return 1 - F.mse_loss(target_encoding, sim_imgs)
+
     def forward(self, src_img: torch.Tensor, source_class: str, target_img: torch.Tensor, target_class: str, texture_image: torch.Tensor = None):
         clip_loss = 0.0
 
@@ -514,4 +536,4 @@ class CLIPLoss(torch.nn.Module):
 
         if self.args.lambda_pca > 0 and self.args.divide_line < 512:
             clip_loss += self.args.lambda_pca * self.pca_directional_loss(src_img, source_class, target_img, target_class)
-        return clip_loss
+        return clip_loss + self.remove_similar_loss(src_img, target_img)

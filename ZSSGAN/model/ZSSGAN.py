@@ -275,10 +275,7 @@ class ZSSGAN(torch.nn.Module):
         randomize_noise=True,
         iter=1,
     ):
-        import pdb
-        pdb.set_trace()
-        print(1)
-        args.return_w_only=False
+    
         if self.training and self.auto_layer_iters > 0:
             self.generator_trainable.unfreeze_layers()
             train_layers = self.determine_opt_layers()
@@ -293,22 +290,22 @@ class ZSSGAN(torch.nn.Module):
             if input_is_latent:
                 w_styles = styles
             else:
-                w_styles = self.generator_frozen.style(styles)+torch.tensor(np.load("boundaries/stylegan_ffhq_smile_w_boundary.npy"))
+                w_styles = self.generator_frozen.style(styles)
             
             if self.args.return_w_only:
-                
-                
                 return w_styles
             
             frozen_img = self.generator_frozen(w_styles, input_is_latent=True, truncation=truncation, randomize_noise=randomize_noise)[0]
 
         trainable_img = self.generator_trainable(w_styles, input_is_latent=True, truncation=truncation, randomize_noise=randomize_noise)[0]
         
-        clip_loss = torch.sum(torch.stack([self.clip_model_weights[model_name] * self.clip_loss_models[model_name](frozen_img, self.source_class, trainable_img, self.target_class) for model_name in self.clip_model_weights.keys()]))
+        clip_loss = torch.sum(torch.stack([self.clip_model_weights[model_name] * self.clip_loss_models[model_name](frozen_img, \
+            self.source_class, trainable_img, self.target_class) for model_name in self.clip_model_weights.keys()]))
 
         if (self.args.lambda_within + self.args.lambda_across > 0) and \
             iter % self.args.regularize_step == 0:
-            clip_loss += self.regularize_loss(frozen_img, trainable_img)
+            clip_loss += self.regularize_loss(frozen_img, trainable_img, \
+                self.clip_loss_models['ViT-B/32'].condition)
             print("Regularize at step {}!".format(iter))
         
         
