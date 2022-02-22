@@ -2,6 +2,7 @@ import math
 import random
 import functools
 import operator
+import numpy as np
 
 import torch
 from torch import nn
@@ -589,7 +590,10 @@ class Generator(nn.Module):
                 latent2 = styles[1].unsqueeze(1).repeat(1, self.n_latent - inject_index, 1)
 
                 latent = torch.cat([latent, latent2], 1)
-
+            # delta_w = np.load('/home/ybyb/CODE/StyleGAN-nada/results/demo_ffhq/photo+Image_1/test/delta.npy').mean()
+            # delta_w = np.load("/home/ybyb/CODE/StyleGAN-nada/results/demo_ffhq/photo+Image_1/test/small_delta_w.npy")
+            # delta_w = torch.from_numpy(delta_w).unsqueeze(0).float().to('cuda')
+            # latent += (100 * delta_w)
             out = self.input(latent)
             out = self.conv1(out, latent[:, 0], noise=noise[0])
 

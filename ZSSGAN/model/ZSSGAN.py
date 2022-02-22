@@ -1,5 +1,8 @@
+from ast import arg
 import sys
 import os
+from turtle import pd
+
 sys.path.insert(0, os.path.abspath('../'))
 
 
@@ -13,6 +16,7 @@ from functools import partial
 
 from ZSSGAN.model.sg2_model import Generator, Discriminator
 from ZSSGAN.criteria.clip_loss import CLIPLoss 
+from ZSSGAN.criteria.psp_loss import PSPLoss
 from ZSSGAN.criteria.regularize_loss import RegularizeLoss      
 
 def requires_grad(model, flag=True):
@@ -153,7 +157,7 @@ class ZSSGAN(torch.nn.Module):
 
         self.args = args
 
-        self.device = 'cuda:0'
+        self.device = 'cuda'
 
         # Set up frozen (source) generator
         self.generator_frozen = SG2Generator(args.frozen_gen_ckpt, img_size=args.size).to(self.device)
@@ -167,18 +171,22 @@ class ZSSGAN(torch.nn.Module):
         self.generator_trainable.train()
 
         # Losses
-        self.clip_loss_models = {model_name: CLIPLoss(self.device, 
-                                                      lambda_direction=args.lambda_direction, 
-                                                      lambda_patch=args.lambda_patch, 
-                                                      lambda_global=args.lambda_global, 
-                                                      lambda_manifold=args.lambda_manifold, 
-                                                      lambda_texture=args.lambda_texture,
-                                                      clip_model=model_name,
-                                                      args=args) 
-                                for model_name in args.clip_models}
+        self.has_clip_loss = (sum(args.clip_model_weights) > 0)
+        if self.has_clip_loss:
+            self.clip_loss_models = {model_name: CLIPLoss(self.device, 
+                                                        lambda_direction=args.lambda_direction, 
+                                                        lambda_patch=args.lambda_patch, 
+                                                        lambda_global=args.lambda_global, 
+                                                        lambda_manifold=args.lambda_manifold, 
+                                                        lambda_texture=args.lambda_texture,
+                                                        clip_model=model_name,
+                                                        args=args) 
+                                    for model_name in args.clip_models}
 
-        self.clip_model_weights = {model_name: weight for model_name, weight in zip(args.clip_models, args.clip_model_weights)}
-
+            self.clip_model_weights = {model_name: weight for model_name, weight in zip(args.clip_models, args.clip_model_weights)}
+        self.has_psp_loss = args.psp_model_weight > 0
+        if self.has_psp_loss:
+            self.psp_loss_model = PSPLoss(self.device, args=args)
         self.mse_loss  = torch.nn.MSELoss()
 
         self.regularize_loss = RegularizeLoss(self.device,
@@ -193,18 +201,8 @@ class ZSSGAN(torch.nn.Module):
         self.auto_layer_k     = args.auto_layer_k
         self.auto_layer_iters = args.auto_layer_iters
 
-        if args.target_img_list is not None:
-            if args.source_img_list is not None:
-                self.set_corresponding_img2img_direction()
-            else:
-                self.set_img2img_direction()
-
-    def set_corresponding_img2img_direction(self):
-        with torch.no_grad():
-            for _, model in self.clip_loss_models.items():
-                direction = model.compute_corresponding_img2img_direction(self.args.source_img_list, self.args.target_img_list)
-                model.target_direction = direction
-                print("Set corresponding img2img direction")
+        if args.target_img_list is not None and self.has_clip_loss:
+            self.set_img2img_direction()
 
     def set_img2img_direction(self):
         with torch.no_grad():
@@ -276,7 +274,7 @@ class ZSSGAN(torch.nn.Module):
         iter=1,
     ):
     
-        if self.training and self.auto_layer_iters > 0:
+        if self.training and self.auto_layer_iters > 0 and self.has_clip_loss:
             self.generator_trainable.unfreeze_layers()
             train_layers = self.determine_opt_layers()
 
@@ -299,17 +297,19 @@ class ZSSGAN(torch.nn.Module):
 
         trainable_img = self.generator_trainable(w_styles, input_is_latent=True, truncation=truncation, randomize_noise=randomize_noise)[0]
         
-        clip_loss = torch.sum(torch.stack([self.clip_model_weights[model_name] * self.clip_loss_models[model_name](frozen_img, \
-            self.source_class, trainable_img, self.target_class) for model_name in self.clip_model_weights.keys()]))
-
+        loss = 0.0
+        if self.has_clip_loss:
+            loss += torch.sum(torch.stack([self.clip_model_weights[model_name] * self.clip_loss_models[model_name](frozen_img, \
+                self.source_class, trainable_img, self.target_class) for model_name in self.clip_model_weights.keys()]))
+        if self.has_psp_loss:
+            loss += self.psp_loss_model(trainable_img, frozen_img).mean()
         if (self.args.lambda_within + self.args.lambda_across > 0) and \
             iter % self.args.regularize_step == 0:
-            clip_loss += self.regularize_loss(frozen_img, trainable_img, \
+            loss += self.regularize_loss(frozen_img, trainable_img, \
                 self.clip_loss_models['ViT-B/32'].condition)
             print("Regularize at step {}!".format(iter))
-        
-        
-        return [frozen_img, trainable_img], clip_loss
+
+        return [frozen_img, trainable_img], loss
 
     def pivot(self):
         par_frozen = dict(self.generator_frozen.named_parameters())

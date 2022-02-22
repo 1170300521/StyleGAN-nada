@@ -30,18 +30,17 @@ Example commands:
 import argparse
 from math import pi
 import os
+from re import I
 from turtle import pd
 import numpy as np
-
+from PIL import Image
 import torch
-from torch._C import device
+from torchvision import transforms
 
 from tqdm import tqdm
 
 from model.ZSSGAN import ZSSGAN
 
-import shutil
-import json
 import pickle
 import matplotlib.pyplot as plt
 from sklearn.decomposition import PCA
@@ -52,6 +51,7 @@ from utils.training_utils import mixing_noise
 
 from options.train_options import TrainOptions
 from criteria.clip_loss import CLIPLoss
+from model.psp import pSp
 
 #TODO convert these to proper args
 SAVE_SRC = True
@@ -130,17 +130,20 @@ def get_avg_image(args):
     with open(os.path.join(args.output_dir, 'mean_w_clip.pkl'), 'wb') as f:
         pickle.dump([src_img_feats, tgt_img_feats], f)
 
+
 def visual(args):
 
+    args.output_dir = os.path.join("../results", "demo_" + args.dataset, \
+        args.source_class.replace(" ", '_') + "+" + args.target_class.replace(" ", "_"), \
+            args.output_dir)
+    sample_dir = args.output_dir
+    os.makedirs(sample_dir, exist_ok=True)
     # Set up networks, optimizers.
     print("Initializing networks...")
+    if os.path.exists(os.path.join(sample_dir, 'checkpoint', '000300.pt')):
+        args.train_gen_ckpt = os.path.join(sample_dir, 'checkpoint', '000300.pt')
+        print("Use pretrained weights from {}".format(os.path.join(sample_dir, 'checkpoint', '000300.pt')))
     net = ZSSGAN(args)
-
-    # Set up output directories.
-    sample_dir = os.path.join(args.output_dir, "samples")
-
-    os.makedirs(sample_dir, exist_ok=True)
-
     # set seed after all networks have been initialized. Avoids change of outputs due to model changes.
     torch.manual_seed(2)
     np.random.seed(2)
@@ -155,12 +158,8 @@ def visual(args):
                 sampled_dst = sampled_dst[:, :, 64:448, :]
 
             grid_rows = 1
-
-            if SAVE_SRC:
-                save_images(sampled_src, sample_dir, "src", grid_rows, i)
-
-            if SAVE_DST:
-                save_images(sampled_dst, sample_dir, "dst", grid_rows, i)
+            save_images(sampled_src, sample_dir, "edit_src", grid_rows, i)
+            # save_images(sampled_dst, sample_dir, "edit_dst", grid_rows, i)
      
 
 def visualize_pca_weights(args):
@@ -190,6 +189,7 @@ def visualize_pca_weights(args):
     plt.ylim(-0.3, 0.3)
     plt.savefig(os.path.join(args.output_dir, args.target_class.replace(" ", '_') + ".jpg"))
     plt.show()
+
 
 def embedding_pair_imgs(img_dir):
     src_sample_path = '/home/ybyb/CODE/StyleGAN-nada/results/ffhq/samples.pkl'
@@ -231,6 +231,7 @@ def embedding_pair_imgs(img_dir):
         
         plt.show()
 
+
 def find_most_similar_imgs(args):
     src_sample_path = '../results/ffhq/photo+Original_samples/samples.pkl'
     clip_loss = CLIPLoss('cuda', 
@@ -252,7 +253,8 @@ def find_most_similar_imgs(args):
     orders = np.argsort(sim)[::-1]
     print(orders[0:20])
     print(sim[orders[0:20]])
-    
+
+
 def visualize_img_pca_weights(args):
     args.alpha = 1.5
     clip_loss = CLIPLoss('cuda', 
@@ -315,10 +317,75 @@ def visualize_img_pca_weights(args):
     plt.show()
 
 
+def get_ffhq_codes(args):
+    psp_encoder = pSp(args.psp_path, device, has_decoder=False)
+    psp_encoder.to(device)
+    psp_encoder.requires_grad_(False)
+    ffhq_dir = "/home/ybyb/Dataset/ffhq_small"
+    style_codes = []
+    os.makedirs(args.output_dir, exist_ok=True)
+    preprocess = transforms.Compose([transforms.Resize((256, 256)),
+                                    transforms.ToTensor(),
+                                    transforms.Normalize([0.5, 0.5, 0.5], [0.5, 0.5, 0.5])])
+    for img_path in tqdm(os.listdir(ffhq_dir)):
+        img = Image.open(os.path.join(ffhq_dir, img_path)).convert("RGB")
+        img = preprocess(img).unsqueeze(0).to(device).float()
+
+        code, _ = psp_encoder(img)
+        # code, invert_img = psp_encoder(img)
+        # save_images(invert_img, args.output_dir, 'invert', 1, 1)
+        style_codes.append(code.detach().cpu().numpy())
+    style_codes = np.concatenate(style_codes, axis=0)
+    
+    with open(os.path.join(args.output_dir, "ffhq_w+.pkl"), 'wb') as f:
+        pickle.dump(style_codes, f)
+
+def get_pair_codes(args, n_samples=10000):
+    '''
+    Generate pair w+ codes for images from domainA and domainB
+    '''
+    # psp_encoder = pSp(args.psp_path, device, has_decoder=False)
+    # psp_encoder.to(device)
+    # psp_encoder.requires_grad_(False)
+    # Set up output directories.
+    args.output_dir = os.path.join("../results", "demo_" + args.dataset, \
+        args.source_class.replace(" ", '_') + "+" + args.target_class.replace(" ", "_"), \
+            args.output_dir)
+    sample_dir = args.output_dir
+    os.makedirs(sample_dir, exist_ok=True)
+    # Set up networks, optimizers.
+    print("Initializing networks...")
+    if os.path.exists(os.path.join(sample_dir, 'checkpoint', '000300.pt')):
+        args.train_gen_ckpt = os.path.join(sample_dir, 'checkpoint', '000300.pt')
+        print("Use pretrained weights from {}".format(os.path.join(sample_dir, 'checkpoint', '000300.pt')))
+    net = ZSSGAN(args)
+    # set seed after all networks have been initialized. Avoids change of outputs due to model changes.
+    torch.manual_seed(2)
+    np.random.seed(2)
+
+    A_codes = []
+    B_codes = []
+    net.eval()
+    with torch.no_grad():
+        for i in tqdm(range(n_samples // 2)):
+            sample_z = mixing_noise(2, 512, args.mixing, device)
+            [sampled_src, sampled_dst], loss = net(sample_z)
+            img = torch.cat([sampled_src, sampled_dst], dim=0)
+            img = net.psp_loss_model.psp_preprocess(img)
+            codes, invert_img = net.psp_loss_model.get_image_features(img, norm=False)
+            codes = codes.detach().cpu().numpy()
+            A_codes.append(codes[0:2])
+            B_codes.append(codes[2:])
+            # save_images(invert_img, args.output_dir, 'invert', 2, i)
+            # save_images(sampled_src, args.output_dir, 'invert_src', 2, i)
+            # save_images(sampled_dst, args.output_dir, 'invert_dst', 2, i)
+    np.save(os.path.join(args.output_dir, 'A_codes.npy'), np.concatenate(A_codes, axis=0))
+    np.save(os.path.join(args.output_dir, 'B_codes.npy'), np.concatenate(B_codes, axis=0))
+    
 if __name__ == "__main__":
 
     args = TrainOptions().parse()
-    # visual(args)
+    visual(args)
     # get_samples(args)
     # target_list = ["Van Goph painting", "Miyazaki Hayao painting", "Fernando Botero painting",\
     #     "3D render in the style of Pixar", "Disney Princess", "White Walker",\
@@ -333,5 +400,6 @@ if __name__ == "__main__":
     # get_avg_image(args)
     # visualize_img_pca_weights(args)
     # embedding_pair_imgs("/home/ybyb/yms/emo/open")
-    find_most_similar_imgs(args)
-    
+    # find_most_similar_imgs(args)
+    # get_ffhq_codes(args)
+    # get_pair_codes(args)

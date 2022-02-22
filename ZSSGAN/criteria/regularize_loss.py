@@ -32,8 +32,6 @@ class RegularizeLoss(torch.nn.Module):
         self.clip_mean = None
         self.pca_components = None
         self.pca = None
-        if self.args.regular_pca_dim > 0:
-            self.pca = self.get_pca()
 
     def get_pca(self):
         orig_sample_path = '../weights/ffhq_samples.pkl'
@@ -80,12 +78,8 @@ class RegularizeLoss(torch.nn.Module):
         if condition is not None:
             v_A = v_A * (1 - condition)
             v_B = v_B * (1 - condition)
-        # if self.args.regular_pca_dim > 0:
-            # v_A = self.get_pca_features(v_A)[..., self.args.begin:self.args.regular_pca_dim]
-            # v_B = self.get_pca_features(v_B)[..., self.args.begin:self.args.regular_pca_dim]
-
+       
         return self.within_dist(v_A, v_B).mean() * (1 - condition.sum() / 512)
-        # return self.within_dist(v_A, v_B).mean()
     
     def across_loss(self, src_img_a, src_img_b, tgt_img_a, tgt_img_b):
         v_ref = tgt_img_a - src_img_a

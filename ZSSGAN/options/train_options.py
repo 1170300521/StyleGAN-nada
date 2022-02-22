@@ -51,19 +51,6 @@ class TrainOptions(object):
         )
 
         self.parser.add_argument(
-            "--lambda_keep",
-            type=float,
-            default=0,
-            help="Strength of keep normal identity loss",
-        )
-
-        self.parser.add_argument(
-            "--lambda_pca",
-            type=float,
-            default=0,
-            help="Strenght of pca directional loss"
-        )
-        self.parser.add_argument(
             "--regularize_step",
             type=int,
             default=10000,
@@ -73,21 +60,9 @@ class TrainOptions(object):
         self.parser.add_argument(
             "--alpha",
             type=float,
-            default=2,
+            default=0,
             help="Coefficient to adjust the degree to supress normal features of the given text"
         )
-        
-        self.parser.add_argument(
-            "--clip_num_alpha",
-            type=float,
-            default=0,
-            help="The coefficient that controls how many dimensions are related to original domain."
-        )
-        # self.parser.add_argument(
-        #     "--enhance",
-        #     action="store_true",
-        #     help="Whether to use enhance supression",
-        # )
 
         self.parser.add_argument(
             "--supress",
@@ -105,36 +80,9 @@ class TrainOptions(object):
         )
 
         self.parser.add_argument(
-            "--use_mean",
-            action="store_true",
-            help="Whether to use mean vectors for source image."
-        )
-
-        self.parser.add_argument(
             "--return_w_only",
             action="store_true",
             help="Return w codes only for GAN when set true."
-        )
-
-        self.parser.add_argument(
-            "--divide_line",
-            type=int,
-            default=512,
-            help="The number of dimensions using supression loss"
-        )
-
-        self.parser.add_argument(
-            "--regular_pca_dim",
-            type=int,
-            default=0,
-            help="The number of pca dimensions used during regularization. 0 reps using clip space."
-        )
-
-        self.parser.add_argument(
-            "--begin",
-            type=int,
-            default=0,
-            help="The starting dimension for within regularization loss",
         )
 
         ######################################################################################################
@@ -253,6 +201,13 @@ class TrainOptions(object):
         )
 
         self.parser.add_argument(
+            "--psp_model_weight",
+            type=float,
+            default=0.0,
+            help="Weight for pSp encoder loss"
+        )
+
+        self.parser.add_argument(
             "--num_grid_outputs", 
             type=int, 
             default=0, 
@@ -272,12 +227,6 @@ class TrainOptions(object):
             "--style_img_dir",
             type=str,
             help="Path to a directory containing images (png, jpg or jpeg) with a specific style to mimic"
-        )
-
-        self.parser.add_argument(
-            "--style_img_dir_src",
-            type=str,
-            help="Path to a directory containing images (png, jpg or jpeg) without a specific style to mimic"
         )
 
         self.parser.add_argument(
@@ -353,6 +302,13 @@ class TrainOptions(object):
             help="path to the checkpoints to resume training",
         )
 
+        self.parser.add_argument(
+            "--psp_path",
+            type=str,
+            default=None,
+            help="Path to pixel2style2pixel encoder."
+        )
+
         self.parser.add_argument("--lr", type=float, default=0.002, help="learning rate")
 
         self.parser.add_argument(
@@ -404,6 +360,5 @@ class TrainOptions(object):
         opts.train_gen_ckpt = opts.train_gen_ckpt or opts.frozen_gen_ckpt
 
         opts.target_img_list = get_dir_img_list(opts.style_img_dir) if opts.style_img_dir else None
-        opts.source_img_list = get_dir_img_list(opts.style_img_dir_src) if opts.style_img_dir_src else None 
-
+        
         return opts

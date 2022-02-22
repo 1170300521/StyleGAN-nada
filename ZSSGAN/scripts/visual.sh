@@ -1,16 +1,18 @@
 CUDA_VISIBLE_DEVICES=1 python visual.py --size 1024 \
                 --batch 2 \
-                --n_sample 4 --output_dir ../results/ffhq/ \
+                --n_sample 4 --output_dir test \
                 --lr 0.002 \
                 --frozen_gen_ckpt ../weights/stylegan2-ffhq-config-f.pt \
+                --psp_path ../weights/psp_ffhq_encode.pt \
                 --iter 301 \
                 --source_class "photo" \
-                --target_class "Van Goph paintings" \
+                --target_class "Image_1" \
                 --auto_layer_k 18 \
                 --auto_layer_iters 0 --auto_layer_batch 8 \
                 --output_interval 50 \
                 --mixing 0.0 \
                 --save_interval 150 \
                 --clip_models "ViT-B/32" \
-                --clip_model_weights 1.0 \
-                --style_img_dir ../img/mind/2.png 
+                --clip_model_weights 0.0 \
+                --psp_model_weight 1.0 \
+                --style_img_dir ../img/mind/1.png \
