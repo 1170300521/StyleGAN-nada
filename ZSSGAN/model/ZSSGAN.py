@@ -302,7 +302,7 @@ class ZSSGAN(torch.nn.Module):
             loss += torch.sum(torch.stack([self.clip_model_weights[model_name] * self.clip_loss_models[model_name](frozen_img, \
                 self.source_class, trainable_img, self.target_class) for model_name in self.clip_model_weights.keys()]))
         if self.has_psp_loss:
-            loss += self.psp_loss_model(trainable_img, frozen_img).mean()
+            loss += self.args.psp_model_weight * self.psp_loss_model(trainable_img, frozen_img).mean()
         if (self.args.lambda_within + self.args.lambda_across > 0) and \
             iter % self.args.regularize_step == 0:
             loss += self.regularize_loss(frozen_img, trainable_img, \

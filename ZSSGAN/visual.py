@@ -52,6 +52,7 @@ from utils.training_utils import mixing_noise
 from options.train_options import TrainOptions
 from criteria.clip_loss import CLIPLoss
 from model.psp import pSp
+from utils.svm import get_delta_w
 
 #TODO convert these to proper args
 SAVE_SRC = True
@@ -340,7 +341,7 @@ def get_ffhq_codes(args):
     with open(os.path.join(args.output_dir, "ffhq_w+.pkl"), 'wb') as f:
         pickle.dump(style_codes, f)
 
-def get_pair_codes(args, n_samples=10000):
+def get_pair_codes(args, n_samples=500):
     '''
     Generate pair w+ codes for images from domainA and domainB
     '''
@@ -381,11 +382,14 @@ def get_pair_codes(args, n_samples=10000):
             # save_images(sampled_dst, args.output_dir, 'invert_dst', 2, i)
     np.save(os.path.join(args.output_dir, 'A_codes.npy'), np.concatenate(A_codes, axis=0))
     np.save(os.path.join(args.output_dir, 'B_codes.npy'), np.concatenate(B_codes, axis=0))
+
+    get_delta_w(os.path.join(args.output_dir, 'B_codes.npy'), \
+            os.path.join(args.output_dir, 'w_delta.npy'), )
     
 if __name__ == "__main__":
 
     args = TrainOptions().parse()
-    visual(args)
+    # visual(args)
     # get_samples(args)
     # target_list = ["Van Goph painting", "Miyazaki Hayao painting", "Fernando Botero painting",\
     #     "3D render in the style of Pixar", "Disney Princess", "White Walker",\
@@ -402,4 +406,4 @@ if __name__ == "__main__":
     # embedding_pair_imgs("/home/ybyb/yms/emo/open")
     # find_most_similar_imgs(args)
     # get_ffhq_codes(args)
-    # get_pair_codes(args)
+    get_pair_codes(args)

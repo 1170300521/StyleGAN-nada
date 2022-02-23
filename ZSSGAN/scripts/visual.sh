@@ -6,7 +6,7 @@ CUDA_VISIBLE_DEVICES=1 python visual.py --size 1024 \
                 --psp_path ../weights/psp_ffhq_encode.pt \
                 --iter 301 \
                 --source_class "photo" \
-                --target_class "Image_1" \
+                --target_class "Image_4" \
                 --auto_layer_k 18 \
                 --auto_layer_iters 0 --auto_layer_batch 8 \
                 --output_interval 50 \
@@ -15,4 +15,4 @@ CUDA_VISIBLE_DEVICES=1 python visual.py --size 1024 \
                 --clip_models "ViT-B/32" \
                 --clip_model_weights 0.0 \
                 --psp_model_weight 1.0 \
-                --style_img_dir ../img/mind/1.png \
+                --style_img_dir ../img/mind/4.png \

@@ -23,7 +23,7 @@ class PSPLoss(torch.nn.Module):
         self.direction_loss = DirectionLoss('cosine')
 
     def get_target_direction(self, normalize=True):
-        delta_w = np.load('/home/ybyb/CODE/StyleGAN-nada/results/demo_ffhq/photo+Image_1/test/small_delta_w.npy')
+        delta_w = np.load('/home/ybyb/CODE/StyleGAN-nada/results/demo_ffhq/photo+Image_4/test/w_delta.npy')
         # delta_w = -np.load('/home/ybyb/CODE/StyleGAN-nada/results/demo_ffhq/photo+Image_1/test/delta.npy').mean(0)
         # delta_w = np.load('/home/ybyb/CODE/StyleGAN-nada/results/invert/tmp.npy')
         # delta_w = delta_w[-1:]
