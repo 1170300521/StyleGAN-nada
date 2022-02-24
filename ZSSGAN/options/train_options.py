@@ -65,6 +65,13 @@ class TrainOptions(object):
         )
 
         self.parser.add_argument(
+            "--psp_alpha",
+            type=float,
+            default=0,
+            help="The coefficent controlling how many attributes to be suppressed under W+ space."
+        )
+
+        self.parser.add_argument(
             "--supress",
             type=int,
             default=0,

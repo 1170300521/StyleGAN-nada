@@ -1,6 +1,7 @@
-from turtle import forward
+import os
 import torch
 import torchvision.transforms as transforms
+import torch.nn.functional as F
 
 import numpy as np
 
@@ -23,13 +24,23 @@ class PSPLoss(torch.nn.Module):
         self.direction_loss = DirectionLoss('cosine')
 
     def get_target_direction(self, normalize=True):
-        delta_w = np.load('/home/ybyb/CODE/StyleGAN-nada/results/demo_ffhq/photo+Image_4/test/w_delta.npy')
+        delta_w_path = os.path.join(self.args.output_dir, 'w_delta.npy')
+
+        if os.path.exists(delta_w_path):
+            delta_w = np.load(os.path.join(self.args.output_dir, 'w_delta.npy'))
+        else:
+            delta_w = np.ones((18, 512))
         # delta_w = -np.load('/home/ybyb/CODE/StyleGAN-nada/results/demo_ffhq/photo+Image_1/test/delta.npy').mean(0)
         # delta_w = np.load('/home/ybyb/CODE/StyleGAN-nada/results/invert/tmp.npy')
         # delta_w = delta_w[-1:]
         delta_w = torch.from_numpy(delta_w).to(self.device).float().view(1, -1)
+        self.cond = (delta_w.abs() <= delta_w.abs().mean() * self.args.psp_alpha).float()
+        print(f"supress_num / overall = {self.cond.sum().item()} / {18 * 512}")
+        delta_w = delta_w * self.cond
+        # delta_w[0] = delta_w[0][torch.randperm(18*512)]
         if normalize:
             delta_w /= delta_w.clone().norm(dim=-1, keepdim=True)
+        
         return delta_w
 
     def get_image_features(self, images, norm=False):
@@ -38,6 +49,7 @@ class PSPLoss(torch.nn.Module):
         # encodings = encodings[:, -1:]
         encodings = encodings.view(images.size(0), -1)
 
+        encodings = encodings * self.cond
         # TODO: different from clip encodings, normalize may be harmful
         if norm:
             encodings /= encodings.clone().norm(dim=-1, keepdim=True)
@@ -50,7 +62,8 @@ class PSPLoss(torch.nn.Module):
         edit_direction = target_encodings - source_encodings
         edit_direction /= edit_direction.clone().norm(dim=-1, keepdim=True)
 
-        return self.direction_loss(edit_direction, self.target_direction)
+        # return self.direction_loss(edit_direction, self.target_direction)
+        return F.l1_loss(target_encodings, source_encodings)
         
 
         

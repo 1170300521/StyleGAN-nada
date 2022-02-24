@@ -380,11 +380,12 @@ def get_pair_codes(args, n_samples=500):
             # save_images(invert_img, args.output_dir, 'invert', 2, i)
             # save_images(sampled_src, args.output_dir, 'invert_src', 2, i)
             # save_images(sampled_dst, args.output_dir, 'invert_dst', 2, i)
-    np.save(os.path.join(args.output_dir, 'A_codes.npy'), np.concatenate(A_codes, axis=0))
+    # np.save(os.path.join(args.output_dir, 'A_codes.npy'), np.concatenate(A_codes, axis=0))
     np.save(os.path.join(args.output_dir, 'B_codes.npy'), np.concatenate(B_codes, axis=0))
 
     get_delta_w(os.path.join(args.output_dir, 'B_codes.npy'), \
-            os.path.join(args.output_dir, 'w_delta.npy'), )
+            os.path.join(args.output_dir, 'w_delta.npy'), 
+                neg_path="/home/ybyb/CODE/StyleGAN-nada/results/invert/ffhq_w+.npy")
     
 if __name__ == "__main__":
 

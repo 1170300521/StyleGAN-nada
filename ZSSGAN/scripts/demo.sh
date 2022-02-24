@@ -7,7 +7,7 @@ CUDA_VISIBLE_DEVICES=1 python train.py  \
                 --psp_path ../weights/psp_ffhq_encode.pt \
                 --iter 301 \
                 --source_class "photo" \
-                --target_class "Image_4" \
+                --target_class "3D render in the style of Pixar" \
                 --alpha 0 \
                 --supress 0 \
                 --pca_dim 512 \
@@ -15,7 +15,7 @@ CUDA_VISIBLE_DEVICES=1 python train.py  \
                 --auto_layer_iters 0 --auto_layer_batch 8 \
                 --output_interval 50 \
                 --mixing 0.0 \
-                --save_interval 100 \
+                --save_interval 50 \
                 --clip_models "ViT-B/32" \
                 --clip_model_weights 1.0 \
                 --psp_model_weight 0.5 \
@@ -25,5 +25,6 @@ CUDA_VISIBLE_DEVICES=1 python train.py  \
                 --lambda_within 5 \
                 --lambda_across 0.0 \
                 --regularize_step 1000 \
-                --style_img_dir ../img/mind/4.png \
+                # --style_img_dir ../img/aligned/031_971_033_4k_clarisse-debray-lesionsona2_00.png
+                # --style_img_dir ../img/mind/4.png \
                 # --train_gen_ckpt /home/ybyb/CODE/StyleGAN-nada/results/demo_ffhq/photo+Image_9/test/checkpoint/original.pt \

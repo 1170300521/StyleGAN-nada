@@ -6,7 +6,7 @@ CUDA_VISIBLE_DEVICES=1 python visual.py --size 1024 \
                 --psp_path ../weights/psp_ffhq_encode.pt \
                 --iter 301 \
                 --source_class "photo" \
-                --target_class "Image_4" \
+                --target_class "3D render in the style of Pixar" \
                 --auto_layer_k 18 \
                 --auto_layer_iters 0 --auto_layer_batch 8 \
                 --output_interval 50 \

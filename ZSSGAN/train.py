@@ -64,7 +64,11 @@ def train(args):
     )
 
     # Set up output directories.
-    sample_dir = os.path.join(args.output_dir, "sample")
+    if args.psp_model_weight > 0:
+        sample_dir = os.path.join(args.output_dir, f"{args.psp_alpha}_mean-clip+psp-sample")
+    else:
+        sample_dir = os.path.join(args.output_dir, "clip-sample")
+
     ckpt_dir   = os.path.join(args.output_dir, "checkpoint")
 
     os.makedirs(sample_dir, exist_ok=True)
