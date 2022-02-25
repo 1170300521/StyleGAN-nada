@@ -1,7 +1,7 @@
 # ffhq: 1024; cat: 512; dog: 512; church: 256; horse: 256; car: 512, crop_for_cars 
-target_class="Van Goph painting"
+target_class="Image_1"
 output_dir="test"
-psp_alpha=0.1
+psp_alpha=0.5
 cuda_id=1
 
 # CUDA_VISIBLE_DEVICES=$cuda_id python train.py  \
@@ -30,7 +30,7 @@ cuda_id=1
 #                 --lambda_within 5 \
 #                 --lambda_across 0.0 \
 #                 --regularize_step 1000 \
-#                 # --style_img_dir ../img/mind/1.png \
+#                 --style_img_dir ../img/mind/1.png \
 #                 # --train_gen_ckpt /home/ybyb/CODE/StyleGAN-nada/results/demo_ffhq/photo+Image_9/test/checkpoint/original.pt \
 
 # CUDA_VISIBLE_DEVICES=$cuda_id python visual.py --size 1024 \
@@ -70,7 +70,7 @@ CUDA_VISIBLE_DEVICES=$cuda_id python train.py  \
                 --save_interval 300 \
                 --clip_models "ViT-B/32" \
                 --clip_model_weights 1 \
-                --psp_model_weight 0.5 \
+                --psp_model_weight 1 \
                 --psp_alpha $psp_alpha \
                 --lambda_direction 1.0 \
                 --lambda_global 0.0 \
@@ -78,5 +78,5 @@ CUDA_VISIBLE_DEVICES=$cuda_id python train.py  \
                 --lambda_within 5 \
                 --lambda_across 0.0 \
                 --regularize_step 1000 \
-                # --style_img_dir ../img/mind/8.png \
+                --style_img_dir ../img/mind/1.png \
                 # --train_gen_ckpt /home/ybyb/CODE/StyleGAN-nada/results/demo_ffhq/photo+Image_9/test/checkpoint/original.pt \

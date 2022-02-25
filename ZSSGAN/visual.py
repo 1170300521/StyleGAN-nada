@@ -341,6 +341,7 @@ def get_ffhq_codes(args):
     with open(os.path.join(args.output_dir, "ffhq_w+.pkl"), 'wb') as f:
         pickle.dump(style_codes, f)
 
+
 def get_pair_codes(args, n_samples=500):
     '''
     Generate pair w+ codes for images from domainA and domainB
@@ -390,7 +391,7 @@ def get_pair_codes(args, n_samples=500):
 if __name__ == "__main__":
 
     args = TrainOptions().parse()
-    # visual(args)
+    visual(args)
     # get_samples(args)
     # target_list = ["Van Goph painting", "Miyazaki Hayao painting", "Fernando Botero painting",\
     #     "3D render in the style of Pixar", "Disney Princess", "White Walker",\
@@ -407,4 +408,4 @@ if __name__ == "__main__":
     # embedding_pair_imgs("/home/ybyb/yms/emo/open")
     # find_most_similar_imgs(args)
     # get_ffhq_codes(args)
-    get_pair_codes(args)
+    # get_pair_codes(args)

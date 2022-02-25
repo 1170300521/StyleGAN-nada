@@ -24,10 +24,11 @@ class PSPLoss(torch.nn.Module):
         self.direction_loss = DirectionLoss('cosine')
 
     def get_target_direction(self, normalize=True):
-        delta_w_path = os.path.join(self.args.output_dir, 'w_delta.npy')
+        # delta_w_path = os.path.join(self.args.output_dir, 'w_delta.npy')
+        delta_w_path = os.path.join(self.args.output_dir, "small_delta_w.npy")
 
         if os.path.exists(delta_w_path):
-            delta_w = np.load(os.path.join(self.args.output_dir, 'w_delta.npy'))
+            delta_w = np.load(delta_w_path)
         else:
             delta_w = np.ones((18, 512))
         # delta_w = -np.load('/home/ybyb/CODE/StyleGAN-nada/results/demo_ffhq/photo+Image_1/test/delta.npy').mean(0)
@@ -36,8 +37,15 @@ class PSPLoss(torch.nn.Module):
         delta_w = torch.from_numpy(delta_w).to(self.device).float().view(1, -1)
         self.cond = (delta_w.abs() <= delta_w.abs().mean() * self.args.psp_alpha).float()
         print(f"supress_num / overall = {self.cond.sum().item()} / {18 * 512}")
-        delta_w = delta_w * self.cond
-        # delta_w[0] = delta_w[0][torch.randperm(18*512)]
+        
+        # tmp = self.cond
+        # num = int(self.cond.sum().item())
+        # order = delta_w.abs().argsort(descending=True)[0][0:num]
+        # self.cond = torch.zeros(18*512).to(self.device)
+        # self.cond[order] = 1
+        # print(f"supress_num / overall = {self.cond.sum().item()} / {18 * 512}")
+        # print(f"abs: {(tmp-self.cond).abs().sum()}")
+
         if normalize:
             delta_w /= delta_w.clone().norm(dim=-1, keepdim=True)
         
