@@ -592,6 +592,14 @@ class Generator(nn.Module):
                 latent = torch.cat([latent, latent2], 1)
 
             if delta_w is not None:
+                # num_channel = len(delta_w.flatten())
+                # order = delta_w.flatten().abs().argsort()
+                # # chosen_order = order[0:int(0.2 * num_channel)]
+                # chosen_order = order[-int(0.2 * num_channel)::]  # Choose most important channels
+                # cond = torch.zeros(num_channel).to(delta_w.device)
+                # cond[chosen_order] = 1
+                # cond = cond.view(1, 18, 512)
+                # delta_w = delta_w * cond
                 latent += (60 * delta_w)
             out = self.input(latent)
             out = self.conv1(out, latent[:, 0], noise=noise[0])

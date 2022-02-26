@@ -41,7 +41,12 @@ class PSPLoss(torch.nn.Module):
         # chosen_order = order[-int(self.args.psp_alpha * num_channel)::]  # Choose most important channels
         self.cond = torch.zeros(num_channel).to(self.device)
         self.cond[chosen_order] = 1
+        if self.args.num_mask_last > 0:
+            style_mask = torch.cat([torch.ones((18 - self.args.num_mask_last) * 512), \
+                torch.zeros(self.args.num_mask_last * 512)], dim=0).to(self.device)
+            self.cond = self.cond * style_mask
         self.cond = self.cond.unsqueeze(0)
+
         print(f"supress_num / overall = {self.cond.sum().item()} / {18 * 512}")
 
         if normalize:

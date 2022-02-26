@@ -72,6 +72,13 @@ class TrainOptions(object):
         )
 
         self.parser.add_argument(
+            "--num_mask_last",
+            type=int,
+            default=0,
+            help="Number of masking w+ codes of last layers to keep styles."
+        )
+
+        self.parser.add_argument(
             "--supress",
             type=int,
             default=0,

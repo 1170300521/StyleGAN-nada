@@ -64,7 +64,7 @@ def train(args):
 
     # Set up output directories.
     if args.psp_model_weight > 0:
-        sample_dir = os.path.join(args.output_dir, f"alpha_{args.psp_alpha}-clip+psp-sample")
+        sample_dir = os.path.join(args.output_dir, f"mask_{args.num_mask_last}-alpha_{args.psp_alpha}-clip+psp-sample")
     else:
         sample_dir = os.path.join(args.output_dir, "clip-sample")
 
