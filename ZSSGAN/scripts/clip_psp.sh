@@ -1,7 +1,7 @@
 # ffhq: 1024; cat: 512; dog: 512; church: 256; horse: 256; car: 512, crop_for_cars 
-target_class="Image_1"
-output_dir="test"
-psp_alpha=0.5
+target_class="Van Goph painting"
+output_dir="A_gen_10k-B_500"
+psp_alpha=0.1
 cuda_id=1
 
 # CUDA_VISIBLE_DEVICES=$cuda_id python train.py  \
@@ -27,11 +27,7 @@ cuda_id=1
 #                 --lambda_direction 1.0 \
 #                 --lambda_global 0.0 \
 #                 --lambda_texture 0.0 \
-#                 --lambda_within 5 \
-#                 --lambda_across 0.0 \
-#                 --regularize_step 1000 \
-#                 --style_img_dir ../img/mind/1.png \
-#                 # --train_gen_ckpt /home/ybyb/CODE/StyleGAN-nada/results/demo_ffhq/photo+Image_9/test/checkpoint/original.pt \
+#                 # --style_img_dir ../img/mind/4.png \
 
 # CUDA_VISIBLE_DEVICES=$cuda_id python visual.py --size 1024 \
 #                 --batch 2 \
@@ -67,7 +63,7 @@ CUDA_VISIBLE_DEVICES=$cuda_id python train.py  \
                 --auto_layer_iters 0 --auto_layer_batch 8 \
                 --output_interval 50 \
                 --mixing 0.0 \
-                --save_interval 300 \
+                --save_interval 400 \
                 --clip_models "ViT-B/32" \
                 --clip_model_weights 1 \
                 --psp_model_weight 1 \
@@ -75,8 +71,4 @@ CUDA_VISIBLE_DEVICES=$cuda_id python train.py  \
                 --lambda_direction 1.0 \
                 --lambda_global 0.0 \
                 --lambda_texture 0.0 \
-                --lambda_within 5 \
-                --lambda_across 0.0 \
-                --regularize_step 1000 \
-                --style_img_dir ../img/mind/1.png \
-                # --train_gen_ckpt /home/ybyb/CODE/StyleGAN-nada/results/demo_ffhq/photo+Image_9/test/checkpoint/original.pt \
+                # --style_img_dir ../img/mind/4.png \

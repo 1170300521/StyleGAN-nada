@@ -533,9 +533,10 @@ class Generator(nn.Module):
         input_is_s_code=False,
         noise=None,
         randomize_noise=True,
+        delta_w=None,
     ):
         if not input_is_s_code:
-            return self.forward_with_w(styles, return_latents, inject_index, truncation, truncation_latent, input_is_latent, noise, randomize_noise)
+            return self.forward_with_w(styles, return_latents, inject_index, truncation, truncation_latent, input_is_latent, noise, randomize_noise, delta_w)
         
         return self.forward_with_s(styles, return_latents, noise, randomize_noise)
 
@@ -549,6 +550,7 @@ class Generator(nn.Module):
             input_is_latent=False,
             noise=None,
             randomize_noise=True,
+            delta_w=None,
         ):
             if not input_is_latent:
                 styles = [self.style(s) for s in styles]
@@ -588,11 +590,9 @@ class Generator(nn.Module):
                 latent2 = styles[1].unsqueeze(1).repeat(1, self.n_latent - inject_index, 1)
 
                 latent = torch.cat([latent, latent2], 1)
-            # delta_w = np.load('/home/ybyb/CODE/StyleGAN-nada/results/demo_ffhq/photo+Image_1/test/delta.npy').mean(0)
-            # delta_w = np.load("/home/ybyb/CODE/StyleGAN-nada/results/demo_ffhq/photo+Image_1/test/small_delta_w.npy")
-            # delta_w = np.load('/home/ybyb/CODE/StyleGAN-nada/results/demo_ffhq/photo+Image_1/test/w_delta.npy')
-            # delta_w = torch.from_numpy(delta_w).unsqueeze(0).float().to('cuda')
-            # latent += (70 * delta_w)
+
+            if delta_w is not None:
+                latent += (60 * delta_w)
             out = self.input(latent)
             out = self.conv1(out, latent[:, 0], noise=noise[0])
 

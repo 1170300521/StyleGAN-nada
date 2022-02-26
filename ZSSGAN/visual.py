@@ -27,32 +27,27 @@ Example commands:
                                            --save_interval 50
 '''
 
-import argparse
-from math import pi
 import os
-from re import I
-from turtle import pd
 import numpy as np
-from PIL import Image
-import torch
-from torchvision import transforms
-
-from tqdm import tqdm
-
-from model.ZSSGAN import ZSSGAN
-
 import pickle
 import matplotlib.pyplot as plt
+import torch
+
+from torchvision import transforms
+from tqdm import tqdm
+from PIL import Image
 from sklearn.decomposition import PCA
 from sklearn.mixture import GaussianMixture
 
-from utils.file_utils import copytree, save_images, save_paper_image_grid
+from utils.file_utils import save_images
 from utils.training_utils import mixing_noise
+from utils.svm import get_delta_w
 
+from model.ZSSGAN import ZSSGAN
+from model.psp import pSp
 from options.train_options import TrainOptions
 from criteria.clip_loss import CLIPLoss
-from model.psp import pSp
-from utils.svm import get_delta_w
+
 
 #TODO convert these to proper args
 SAVE_SRC = True
@@ -64,13 +59,7 @@ def get_samples(args, n_samples=10000):
     '''
     Sample images from GAN and embed them into clip representation space (norm)
     '''
-    # Set up output directories.
-    desc = args.source_class.replace(" ", '_') + "+" + args.target_class.replace(" ", "_")
-    # prefix = f"supress_src_{args.supress_src}-alpha_{args.alpha}"
-
-    args.output_dir = os.path.join("../results", args.dataset, desc)
     sample_dir = args.output_dir
-    os.makedirs(sample_dir, exist_ok=True)
     # Set up networks, optimizers.
     print("Initializing networks...")
     if os.path.exists(os.path.join(sample_dir, 'checkpoint', '000300.pt')):
@@ -108,10 +97,6 @@ def get_samples(args, n_samples=10000):
 
 def get_avg_image(args):
     print("Initializing networks...")
-    args.output_dir = os.path.join("../results", "demo_" + args.dataset, \
-        args.source_class.replace(" ", '_') + "+" + args.target_class.replace(" ", "_"), \
-            args.output_dir)
-    os.makedirs(args.output_dir, exist_ok=True)
     if os.path.exists(os.path.join(args.output_dir, 'checkpoint', '000300.pt')):
         args.train_gen_ckpt = os.path.join(args.output_dir, 'checkpoint', '000300.pt')
         print("Use pretrained weights from {}".format(os.path.join(args.output_dir), 'checkpoint', '000300.pt'))
@@ -133,18 +118,22 @@ def get_avg_image(args):
 
 
 def visual(args):
-
-    args.output_dir = os.path.join("../results", "demo_" + args.dataset, \
-        args.source_class.replace(" ", '_') + "+" + args.target_class.replace(" ", "_"), \
-            args.output_dir)
     sample_dir = args.output_dir
-    os.makedirs(sample_dir, exist_ok=True)
+    img_dir = os.path.join(sample_dir, 'edit_imgs')
+    os.makedirs(img_dir, exist_ok=True)
     # Set up networks, optimizers.
     print("Initializing networks...")
     if os.path.exists(os.path.join(sample_dir, 'checkpoint', '000300.pt')):
         args.train_gen_ckpt = os.path.join(sample_dir, 'checkpoint', '000300.pt')
         print("Use pretrained weights from {}".format(os.path.join(sample_dir, 'checkpoint', '000300.pt')))
     net = ZSSGAN(args)
+
+    # Get editing vector (delta_w)
+    if os.path.exists(os.path.join(sample_dir, 'small_gen_w.npy')):
+        delta_w = np.load(os.path.join(sample_dir, 'small_gen_w.npy'))
+        delta_w = torch.from_numpy(delta_w).unsqueeze(0).float().to(device)
+    else:
+        delta_w = None
     # set seed after all networks have been initialized. Avoids change of outputs due to model changes.
     torch.manual_seed(2)
     np.random.seed(2)
@@ -154,13 +143,12 @@ def visual(args):
     for i in range(10):
         with torch.no_grad():
             fixed_z = torch.randn(1, 512, device=device)
-            [sampled_src, sampled_dst], loss = net([fixed_z], truncation=args.sample_truncation)
+            [sampled_src, sampled_dst], loss = net([fixed_z], truncation=args.sample_truncation, delta_w=delta_w)
             if args.crop_for_cars:
                 sampled_dst = sampled_dst[:, :, 64:448, :]
 
             grid_rows = 1
-            save_images(sampled_src, sample_dir, "edit_src", grid_rows, i)
-            # save_images(sampled_dst, sample_dir, "edit_dst", grid_rows, i)
+            save_images(sampled_src, img_dir, "src", grid_rows, i)
      
 
 def visualize_pca_weights(args):
@@ -288,8 +276,6 @@ def visualize_img_pca_weights(args):
     orders = np.argsort(std)[::-1][0:50]
     gm_x = X[:, orders]
     gm.fit(gm_x)
-    import pdb
-    pdb.set_trace()
 
     if src_sample_path == tgt_sample_path:
         Y = X
@@ -346,15 +332,6 @@ def get_pair_codes(args, n_samples=500):
     '''
     Generate pair w+ codes for images from domainA and domainB
     '''
-    # psp_encoder = pSp(args.psp_path, device, has_decoder=False)
-    # psp_encoder.to(device)
-    # psp_encoder.requires_grad_(False)
-    # Set up output directories.
-    args.output_dir = os.path.join("../results", "demo_" + args.dataset, \
-        args.source_class.replace(" ", '_') + "+" + args.target_class.replace(" ", "_"), \
-            args.output_dir)
-    sample_dir = args.output_dir
-    os.makedirs(sample_dir, exist_ok=True)
     # Set up networks, optimizers.
     print("Initializing networks...")
     if os.path.exists(os.path.join(sample_dir, 'checkpoint', '000300.pt')):
@@ -379,18 +356,28 @@ def get_pair_codes(args, n_samples=500):
             A_codes.append(codes[0:2])
             B_codes.append(codes[2:])
             # save_images(invert_img, args.output_dir, 'invert', 2, i)
-            # save_images(sampled_src, args.output_dir, 'invert_src', 2, i)
-            # save_images(sampled_dst, args.output_dir, 'invert_dst', 2, i)
+            # save_images(sampled_src, args.output_dir, 'src', 2, i)
+            # save_images(sampled_dst, args.output_dir, 'dst', 2, i)
     # np.save(os.path.join(args.output_dir, 'A_codes.npy'), np.concatenate(A_codes, axis=0))
     np.save(os.path.join(args.output_dir, 'B_codes.npy'), np.concatenate(B_codes, axis=0))
 
     get_delta_w(os.path.join(args.output_dir, 'B_codes.npy'), \
-            os.path.join(args.output_dir, 'w_delta.npy'), 
-                neg_path="/home/ybyb/CODE/StyleGAN-nada/results/invert/ffhq_w+.npy")
+            os.path.join(args.output_dir, 'small_gen_w.npy'))
+                # neg_path="/home/ybyb/CODE/StyleGAN-nada/results/invert/ffhq_w+.npy")
     
+
 if __name__ == "__main__":
 
     args = TrainOptions().parse()
+
+    # Make output directory
+    args.output_dir = os.path.join("../results", "demo_" + args.dataset, \
+        args.source_class.replace(" ", '_') + "+" + args.target_class.replace(" ", "_"), \
+            args.output_dir)
+    sample_dir = args.output_dir
+    os.makedirs(sample_dir, exist_ok=True)
+
+    get_pair_codes(args)
     visual(args)
     # get_samples(args)
     # target_list = ["Van Goph painting", "Miyazaki Hayao painting", "Fernando Botero painting",\
@@ -408,4 +395,3 @@ if __name__ == "__main__":
     # embedding_pair_imgs("/home/ybyb/yms/emo/open")
     # find_most_similar_imgs(args)
     # get_ffhq_codes(args)
-    # get_pair_codes(args)

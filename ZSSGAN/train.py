@@ -27,7 +27,6 @@ Example commands:
                                            --save_interval 50
 '''
 
-import argparse
 import os
 import numpy as np
 
@@ -65,7 +64,7 @@ def train(args):
 
     # Set up output directories.
     if args.psp_model_weight > 0:
-        sample_dir = os.path.join(args.output_dir, f"{args.psp_alpha}_mean-clip+psp-sample")
+        sample_dir = os.path.join(args.output_dir, f"alpha_{args.psp_alpha}-clip+psp-sample")
     else:
         sample_dir = os.path.join(args.output_dir, "clip-sample")
 
@@ -87,7 +86,7 @@ def train(args):
 
         sample_z = mixing_noise(args.batch, 512, args.mixing, device)
 
-        [sampled_src, sampled_dst], loss = net(sample_z, iter=i+1)
+        [sampled_src, sampled_dst], loss = net(sample_z)
 
         net.zero_grad()
         loss.backward()

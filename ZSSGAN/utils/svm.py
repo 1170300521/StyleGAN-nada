@@ -38,11 +38,11 @@ def train_boundary(pos_codes, neg_codes, split_ratio=0.7):
     a = classifier.coef_.reshape(1, pos_codes.shape[1]).astype(np.float32)
     return a / np.linalg.norm(a)
 
-def get_delta_w(pos_path, output_path, neg_path="/home/ybyb/CODE/StyleGAN-nada/results/demo_ffhq/photo+Image_1/test/A_codes.npy"):
-    chosen_num = 10000
-    pos_num = 500
+def get_delta_w(pos_path, output_path, neg_path="/home/ybyb/CODE/StyleGAN-nada/results/invert/A_gen_w.npy"):
     pos_codes = np.load(pos_path).reshape((-1, 18, 512))[:, :]
     neg_codes = np.load(neg_path).reshape((-1, 18, 512))[:, :]
+    chosen_num = min(10000, len(neg_codes))
+    pos_num = min(500, len(pos_codes))
     # np.save("/home/ybyb/CODE/StyleGAN-nada/results/demo_ffhq/photo+Image_1/test/mean_delta_w.npy", (pos_codes.mean(0) - neg_codes.mean(0)))
     np.random.shuffle(pos_codes)
     np.random.shuffle(neg_codes)

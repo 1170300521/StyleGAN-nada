@@ -25,7 +25,7 @@ class PSPLoss(torch.nn.Module):
 
     def get_target_direction(self, normalize=True):
         # delta_w_path = os.path.join(self.args.output_dir, 'w_delta.npy')
-        delta_w_path = os.path.join(self.args.output_dir, "small_delta_w.npy")
+        delta_w_path = os.path.join(self.args.output_dir, "small_gen_w.npy")
 
         if os.path.exists(delta_w_path):
             delta_w = np.load(delta_w_path)
@@ -34,17 +34,15 @@ class PSPLoss(torch.nn.Module):
         # delta_w = -np.load('/home/ybyb/CODE/StyleGAN-nada/results/demo_ffhq/photo+Image_1/test/delta.npy').mean(0)
         # delta_w = np.load('/home/ybyb/CODE/StyleGAN-nada/results/invert/tmp.npy')
         # delta_w = delta_w[-1:]
-        delta_w = torch.from_numpy(delta_w).to(self.device).float().view(1, -1)
-        self.cond = (delta_w.abs() <= delta_w.abs().mean() * self.args.psp_alpha).float()
+        delta_w = torch.from_numpy(delta_w).to(self.device).float().flatten()
+        num_channel = len(delta_w)
+        order = delta_w.abs().argsort()
+        chosen_order = order[0:int(self.args.psp_alpha * num_channel)]
+        # chosen_order = order[-int(self.args.psp_alpha * num_channel)::]  # Choose most important channels
+        self.cond = torch.zeros(num_channel).to(self.device)
+        self.cond[chosen_order] = 1
+        self.cond = self.cond.unsqueeze(0)
         print(f"supress_num / overall = {self.cond.sum().item()} / {18 * 512}")
-        
-        # tmp = self.cond
-        # num = int(self.cond.sum().item())
-        # order = delta_w.abs().argsort(descending=True)[0][0:num]
-        # self.cond = torch.zeros(18*512).to(self.device)
-        # self.cond[order] = 1
-        # print(f"supress_num / overall = {self.cond.sum().item()} / {18 * 512}")
-        # print(f"abs: {(tmp-self.cond).abs().sum()}")
 
         if normalize:
             delta_w /= delta_w.clone().norm(dim=-1, keepdim=True)
@@ -57,7 +55,6 @@ class PSPLoss(torch.nn.Module):
         # encodings = encodings[:, -1:]
         encodings = encodings.view(images.size(0), -1)
 
-        encodings = encodings * self.cond
         # TODO: different from clip encodings, normalize may be harmful
         if norm:
             encodings /= encodings.clone().norm(dim=-1, keepdim=True)
@@ -66,9 +63,11 @@ class PSPLoss(torch.nn.Module):
     def forward(self, target_imgs, source_imgs):
         target_encodings, _ = self.get_image_features(target_imgs)
         source_encodings, _ = self.get_image_features(source_imgs)
+        target_encodings = self.cond * target_encodings
+        source_encodings = self.cond * source_encodings
 
-        edit_direction = target_encodings - source_encodings
-        edit_direction /= edit_direction.clone().norm(dim=-1, keepdim=True)
+        # edit_direction = target_encodings - source_encodings
+        # edit_direction /= edit_direction.clone().norm(dim=-1, keepdim=True)
 
         # return self.direction_loss(edit_direction, self.target_direction)
         return F.l1_loss(target_encodings, source_encodings)

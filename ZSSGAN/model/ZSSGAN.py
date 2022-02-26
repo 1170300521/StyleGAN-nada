@@ -24,7 +24,7 @@ def requires_grad(model, flag=True):
         p.requires_grad = flag
 
 class SG2Generator(torch.nn.Module):
-    def __init__(self, checkpoint_path, latent_size=512, map_layers=8, img_size=256, channel_multiplier=2, device='cuda:0'):
+    def __init__(self, checkpoint_path, latent_size=512, map_layers=8, img_size=256, channel_multiplier=2, device='cuda'):
         super(SG2Generator, self).__init__()
 
         self.generator = Generator(
@@ -107,8 +107,12 @@ class SG2Generator(torch.nn.Module):
         input_is_latent=False,
         input_is_s_code=False,
         noise=None,
-        randomize_noise=True):
-        return self.generator(styles, return_latents=return_latents, truncation=truncation, truncation_latent=self.mean_latent, noise=noise, randomize_noise=randomize_noise, input_is_latent=input_is_latent, input_is_s_code=input_is_s_code)
+        randomize_noise=True,
+        delta_w=None):
+        return self.generator(styles, return_latents=return_latents, truncation=truncation, \
+            truncation_latent=self.mean_latent, noise=noise, randomize_noise=randomize_noise, \
+                input_is_latent=input_is_latent, input_is_s_code=input_is_s_code, \
+                    delta_w=delta_w)
 
 class SG2Discriminator(torch.nn.Module):
     def __init__(self, checkpoint_path, img_size=256, channel_multiplier=2, device='cuda:0'):
@@ -271,7 +275,7 @@ class ZSSGAN(torch.nn.Module):
         input_is_latent=False,
         noise=None,
         randomize_noise=True,
-        iter=1,
+        delta_w=None,
     ):
     
         if self.training and self.auto_layer_iters > 0 and self.has_clip_loss:
@@ -293,21 +297,20 @@ class ZSSGAN(torch.nn.Module):
             if self.args.return_w_only:
                 return w_styles
             
-            frozen_img = self.generator_frozen(w_styles, input_is_latent=True, truncation=truncation, randomize_noise=randomize_noise)[0]
+            frozen_img = self.generator_frozen(w_styles, input_is_latent=True, \
+                truncation=truncation, randomize_noise=randomize_noise, \
+                    delta_w=delta_w)[0]
 
-        trainable_img = self.generator_trainable(w_styles, input_is_latent=True, truncation=truncation, randomize_noise=randomize_noise)[0]
+        trainable_img = self.generator_trainable(w_styles, input_is_latent=True, \
+            truncation=truncation, randomize_noise=randomize_noise)[0]
         
         loss = 0.0
         if self.has_clip_loss:
             loss += torch.sum(torch.stack([self.clip_model_weights[model_name] * self.clip_loss_models[model_name](frozen_img, \
                 self.source_class, trainable_img, self.target_class) for model_name in self.clip_model_weights.keys()]))
+
         if self.has_psp_loss:
             loss += self.args.psp_model_weight * self.psp_loss_model(trainable_img, frozen_img).mean()
-        if (self.args.lambda_within + self.args.lambda_across > 0) and \
-            iter % self.args.regularize_step == 0:
-            loss += self.regularize_loss(frozen_img, trainable_img, \
-                self.clip_loss_models['ViT-B/32'].condition)
-            print("Regularize at step {}!".format(iter))
 
         return [frozen_img, trainable_img], loss
 
