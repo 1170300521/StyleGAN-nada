@@ -52,7 +52,7 @@ class PSPLoss(torch.nn.Module):
         if normalize:
             delta_w /= delta_w.clone().norm(dim=-1, keepdim=True)
         
-        return delta_w
+        return delta_w.unsqueeze(0)
 
     def get_image_features(self, images, norm=False):
         images = self.psp_preprocess(images)
@@ -68,14 +68,19 @@ class PSPLoss(torch.nn.Module):
     def forward(self, target_imgs, source_imgs):
         target_encodings, _ = self.get_image_features(target_imgs)
         source_encodings, _ = self.get_image_features(source_imgs)
+
         target_encodings = self.cond * target_encodings
         source_encodings = self.cond * source_encodings
+        return F.l1_loss(target_encodings, source_encodings)
 
         # edit_direction = target_encodings - source_encodings
         # edit_direction /= edit_direction.clone().norm(dim=-1, keepdim=True)
-
         # return self.direction_loss(edit_direction, self.target_direction)
-        return F.l1_loss(target_encodings, source_encodings)
-        
 
+        # num = (18-self.args.num_mask_last) * 512
+        # edit_direction = target_encodings - source_encodings
+        # edit_direction = edit_direction[:, 0: num]
+        # theta = (edit_direction.clone() * self.target_direction[:, 0:num]).sum(dim=-1, keepdim=True)
+        # return F.l1_loss(edit_direction, theta * self.target_direction[:, 0:num])
+        
         

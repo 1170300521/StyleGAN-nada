@@ -1,8 +1,8 @@
 # ffhq: 1024; cat: 512; dog: 512; church: 256; horse: 256; car: 512, crop_for_cars 
-target_class="Van Goph painting"
+target_class="028_681_722_4k_cameron-mark-zoia_00.png"
 output_dir="A_gen_10k-B_500"
-psp_alpha=0.2
-num_mask_last=8
+psp_alpha=0.7
+num_mask_last=10
 cuda_id=1
 
 # CUDA_VISIBLE_DEVICES=$cuda_id python train.py  \
@@ -28,7 +28,7 @@ cuda_id=1
 #                 --lambda_direction 1.0 \
 #                 --lambda_global 0.0 \
 #                 --lambda_texture 0.0 \
-#                 # --style_img_dir ../img/mind/4.png \
+#                 --style_img_dir ../img/aligned/028_681_722_4k_cameron-mark-zoia_00.png
 
 # CUDA_VISIBLE_DEVICES=$cuda_id python visual.py --size 1024 \
 #                 --batch 2 \
@@ -73,4 +73,4 @@ CUDA_VISIBLE_DEVICES=$cuda_id python train.py  \
                 --lambda_direction 1.0 \
                 --lambda_global 0.0 \
                 --lambda_texture 0.0 \
-                # --style_img_dir ../img/mind/4.png \
+                --style_img_dir ../img/aligned/028_681_722_4k_cameron-mark-zoia_00.png \
