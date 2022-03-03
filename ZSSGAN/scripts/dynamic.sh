@@ -1,11 +1,11 @@
 # ffhq: 1024; cat: 512; dog: 512; church: 256; horse: 256; car: 512, crop_for_cars 
-target_class="Disney princess"
+target_class="Image_4"
 output_dir="A_gen_10k-B_500"
-psp_alpha=0.15
+psp_alpha=0.4
 num_mask_last=10
 cuda_id=1
 psp_loss_type="dynamic"
-lambda_constrain=1
+lambda_constrain=0
 
 
 CUDA_VISIBLE_DEVICES=$cuda_id python train.py  \
@@ -35,4 +35,4 @@ CUDA_VISIBLE_DEVICES=$cuda_id python train.py  \
                 --lambda_constrain $lambda_constrain \
                 --lambda_global 0.0 \
                 --lambda_texture 0.0 \
-                # --style_img_dir ../img/mind/1.png \
+                --style_img_dir ../img/mind/4.png \

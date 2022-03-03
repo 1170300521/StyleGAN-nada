@@ -28,6 +28,8 @@ class PSPLoss(torch.nn.Module):
                                     transforms.Normalize([0.5, 0.5, 0.5], [0.5, 0.5, 0.5])])
         self.target_direction = self.get_target_direction()
         self.direction_loss = DirectionLoss('cosine')
+        self.iter_diff = []
+        self.iter_mean = []
 
     def get_source_mean(self):
         source_path = "/home/ybyb/CODE/StyleGAN-nada/results/invert/A_gen_w.npy"
@@ -42,7 +44,7 @@ class PSPLoss(torch.nn.Module):
 
     def get_target_direction(self, normalize=True):
         # delta_w_path = os.path.join(self.args.output_dir, 'w_delta.npy')
-        delta_w_path = os.path.join(self.args.output_dir, "small_gen_w.npy")
+        delta_w_path = os.path.join(self.args.output_dir, "mean_w.npy")
 
         if os.path.exists(delta_w_path):
             delta_w = np.load(delta_w_path)
@@ -122,8 +124,10 @@ class PSPLoss(torch.nn.Module):
         target_encodings = cond * target_encodings
         source_encodings = cond * source_encodings
 
-        # Update the mean direction of target domain
+        # Update the mean direction of target domain and difference
         self.target_mean = new_target_mean.detach()
+        self.iter_diff.append(F.l1_loss(cond, self.cond).cpu().item())
+        self.iter_mean.append(cond.mean().cpu().item())
         
         loss =  F.l1_loss(target_encodings, source_encodings)
         if self.args.lambda_constrain > 0:

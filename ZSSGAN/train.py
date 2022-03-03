@@ -145,6 +145,18 @@ def train(args):
         cond_mask = cond_mask.cpu().numpy()
         np.save(os.path.join(sample_dir, "cond_mask.npy"), cond_mask)
 
+        import matplotlib.pyplot as plt
+        iter_num = len(net.psp_loss_model.iter_diff)
+        x = np.arange(iter_num, dtype=np.float)
+        # Save difference between the dynamic and overall
+        plt.plot(x, net.psp_loss_model.iter_diff)
+        plt.savefig(os.path.join(sample_dir, "mask_diff.png"))
+        plt.clf()
+        # Save dynamic mean values
+        plt.plot(x, net.psp_loss_model.iter_mean)
+        plt.savefig(os.path.join(sample_dir, "mask_mean.png"))
+
+
 if __name__ == "__main__":
     device = "cuda"
 
