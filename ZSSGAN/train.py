@@ -63,8 +63,9 @@ def train(args):
     )
 
     # Set up output directories.
+    prefix = args.psp_loss_type
     if args.psp_model_weight > 0:
-        sample_dir = os.path.join(args.output_dir, f"mask_{args.num_mask_last}-alpha_{args.psp_alpha}-clip+psp-sample")
+        sample_dir = os.path.join(args.output_dir, f"{prefix}_mask_{args.num_mask_last}-alpha_{args.psp_alpha}-clip+psp-sample")
     else:
         sample_dir = os.path.join(args.output_dir, "clip-sample")
 
@@ -137,7 +138,12 @@ def train(args):
                 sampled_dst = sampled_dst[:, :, 64:448, :]
 
         save_paper_image_grid(sampled_dst, sample_dir, f"sampled_grid_{i}.png")
-            
+
+    # Save conditional mask if exists
+    if net.has_psp_loss:
+        cond_mask = net.psp_loss_model.get_conditional_mask()
+        cond_mask = cond_mask.cpu().numpy()
+        np.save(os.path.join(sample_dir, "cond_mask.npy"), cond_mask)
 
 if __name__ == "__main__":
     device = "cuda"

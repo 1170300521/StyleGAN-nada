@@ -51,6 +51,13 @@ class TrainOptions(object):
         )
 
         self.parser.add_argument(
+            "--lambda_constrain",
+            type=float,
+            default=0,
+            help="Strenghth of constraints on masks of w+ codes"
+        )
+
+        self.parser.add_argument(
             "--regularize_step",
             type=int,
             default=10000,
@@ -204,6 +211,13 @@ class TrainOptions(object):
             type=str, 
             default=["ViT-B/32"], 
             help="Names of CLIP models to use for losses"
+        )
+
+        self.parser.add_argument(
+            "--psp_loss_type",
+            type=str,
+            default="multi_stage",
+            help="Type of psp loss, including multi_stage, dynamic."
         )
 
         self.parser.add_argument(
