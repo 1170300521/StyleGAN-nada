@@ -129,8 +129,9 @@ def visual(args):
     net = ZSSGAN(args)
 
     # Get editing vector (delta_w)
-    if os.path.exists(os.path.join(sample_dir, 'mean_w.npy')):
-        delta_w = np.load(os.path.join(sample_dir, 'mean_w.npy'))
+    if os.path.exists(os.path.join(sample_dir, f'{args.delta_w_type}_w.npy')):
+        delta_w = np.load(os.path.join(sample_dir, f'{args.delta_w_type}_w.npy'))
+        # delta_w = np.load(os.path.join(sample_dir, 'dynamic_svm_10-alpha_0.4-clip+psp-sample/dynamic_w.npy'))
         delta_w = torch.from_numpy(delta_w).unsqueeze(0).float().to(device)
     else:
         delta_w = None
@@ -362,7 +363,9 @@ def get_pair_codes(args, n_samples=500):
     np.save(os.path.join(args.output_dir, 'B_codes.npy'), np.concatenate(B_codes, axis=0))
 
     get_delta_w(os.path.join(args.output_dir, 'B_codes.npy'), \
-            os.path.join(args.output_dir, 'mean_w.npy'))
+            os.path.join(args.output_dir, f'{args.delta_w_type}_w.npy'), \
+                delta_w_type=args.delta_w_type,
+                args=args)
                 # neg_path="/home/ybyb/CODE/StyleGAN-nada/results/invert/ffhq_w+.npy")
     
 

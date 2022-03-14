@@ -62,10 +62,16 @@ def train(args):
         betas=(0 ** g_reg_ratio, 0.99 ** g_reg_ratio),
     )
 
+    args.svm_boundary = None
+    if args.psp_loss_type == "dynamic" and args.delta_w_type == 'svm':
+        args.svm_boundary = torch.randn(1, (18 - args.num_mask_last) * 512 + 1,\
+            requires_grad=True, device=device)
+        g_optim.add_param_group({'params': args.svm_boundary})
+
     # Set up output directories.
-    prefix = args.psp_loss_type
+    prefix = f"{args.psp_loss_type}_{args.delta_w_type}"
     if args.psp_model_weight > 0:
-        sample_dir = os.path.join(args.output_dir, f"{prefix}_mask_{args.num_mask_last}-alpha_{args.psp_alpha}-clip+psp-sample")
+        sample_dir = os.path.join(args.output_dir, f"{prefix}_{args.num_mask_last}-alpha_{args.psp_alpha}-clip+psp-sample")
     else:
         sample_dir = os.path.join(args.output_dir, "clip-sample")
 
@@ -87,7 +93,7 @@ def train(args):
 
         sample_z = mixing_noise(args.batch, 512, args.mixing, device)
 
-        [sampled_src, sampled_dst], loss = net(sample_z)
+        [sampled_src, sampled_dst], loss = net(sample_z, iters=i)
 
         net.zero_grad()
         loss.backward()
@@ -141,9 +147,15 @@ def train(args):
 
     # Save conditional mask if exists
     if net.has_psp_loss:
-        cond_mask = net.psp_loss_model.get_conditional_mask()
+        cond_mask, delta_w = net.psp_loss_model.get_conditional_mask()
         cond_mask = cond_mask.cpu().numpy()
         np.save(os.path.join(sample_dir, "cond_mask.npy"), cond_mask)
+
+        if args.psp_loss_type == "dynamic":
+            delta_w = delta_w / delta_w.norm()
+            tmp = torch.zeros(18, 512, device=delta_w.device)
+            tmp[0:(18-args.num_mask_last)] = delta_w.view(-1, 512)
+            np.save(os.path.join(sample_dir, "dynamic_w.npy"), tmp.cpu().numpy())
 
         import matplotlib.pyplot as plt
         iter_num = len(net.psp_loss_model.iter_diff)

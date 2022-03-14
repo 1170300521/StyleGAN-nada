@@ -1,9 +1,10 @@
 # ffhq: 1024; cat: 512; dog: 512; church: 256; horse: 256; car: 512, crop_for_cars 
-target_class="Image_4"
-output_dir="A_gen_10k-B_500"
+target_class="Image_1"
+output_dir="A_gen_500-B_500"
 psp_alpha=0.4
 num_mask_last=10
 cuda_id=1
+delta_w_type='svm'
 
 CUDA_VISIBLE_DEVICES=$cuda_id python train.py  \
                 --batch 2  --dataset "ffhq" \
@@ -28,7 +29,7 @@ CUDA_VISIBLE_DEVICES=$cuda_id python train.py  \
                 --lambda_direction 1.0 \
                 --lambda_global 0.0 \
                 --lambda_texture 0.0 \
-                --style_img_dir ../img/mind/4.png
+                --style_img_dir ../img/mind/1.png
 
 CUDA_VISIBLE_DEVICES=$cuda_id python visual.py --size 1024 \
                 --batch 2 \
@@ -47,6 +48,8 @@ CUDA_VISIBLE_DEVICES=$cuda_id python visual.py --size 1024 \
                 --clip_models "ViT-B/32" \
                 --clip_model_weights 0.0 \
                 --psp_model_weight 1.0 \
+                --num_mask_last $num_mask_last \
+                --delta_w_type $delta_w_type \
 
 CUDA_VISIBLE_DEVICES=$cuda_id python train.py  \
                 --batch 2  --dataset "ffhq" \
@@ -73,4 +76,5 @@ CUDA_VISIBLE_DEVICES=$cuda_id python train.py  \
                 --lambda_direction 1.0 \
                 --lambda_global 0.0 \
                 --lambda_texture 0.0 \
-                --style_img_dir ../img/mind/4.png \
+                --delta_w_type $delta_w_type \
+                --style_img_dir ../img/mind/1.png \

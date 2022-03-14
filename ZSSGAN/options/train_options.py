@@ -101,6 +101,20 @@ class TrainOptions(object):
         )
 
         self.parser.add_argument(
+            "--sliding_window_size",
+            type=int,
+            default=1,
+            help="Window size for dynamic constrained loss."
+        )
+
+        self.parser.add_argument(
+            "--delta_w_type",
+            type=str,
+            default='mean',
+            help="How to obtain the delta_w, mean or svm"
+        )
+
+        self.parser.add_argument(
             "--return_w_only",
             action="store_true",
             help="Return w codes only for GAN when set true."

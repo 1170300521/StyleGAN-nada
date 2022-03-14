@@ -276,6 +276,7 @@ class ZSSGAN(torch.nn.Module):
         noise=None,
         randomize_noise=True,
         delta_w=None,
+        iters=1,
     ):
     
         if self.training and self.auto_layer_iters > 0 and self.has_clip_loss:
@@ -310,7 +311,8 @@ class ZSSGAN(torch.nn.Module):
                 self.source_class, trainable_img, self.target_class) for model_name in self.clip_model_weights.keys()]))
 
         if self.has_psp_loss:
-            loss += self.args.psp_model_weight * self.psp_loss_model(trainable_img, frozen_img).mean()
+            loss += self.args.psp_model_weight * \
+                self.psp_loss_model(trainable_img, frozen_img, iters=iters).mean()
 
         return [frozen_img, trainable_img], loss
 
