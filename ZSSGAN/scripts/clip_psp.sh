@@ -1,7 +1,7 @@
 # ffhq: 1024; cat: 512; dog: 512; church: 256; horse: 256; car: 512, crop_for_cars 
 target_class="Image_1"
-output_dir="A_gen_500-B_500"
-psp_alpha=0.4
+output_dir="A_gen_10k-B_500"
+psp_alpha=0.3
 num_mask_last=10
 cuda_id=1
 delta_w_type='svm'

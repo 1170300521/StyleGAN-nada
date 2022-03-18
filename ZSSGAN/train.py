@@ -29,6 +29,7 @@ Example commands:
 
 import os
 import numpy as np
+from sklearn.utils import shuffle
 
 import torch
 
@@ -38,6 +39,7 @@ from model.ZSSGAN import ZSSGAN
 
 import shutil
 import json
+from sklearn.linear_model import SGDClassifier, SGDOneClassSVM
 
 from utils.file_utils import copytree, save_images, save_paper_image_grid
 from utils.training_utils import mixing_noise
@@ -62,11 +64,9 @@ def train(args):
         betas=(0 ** g_reg_ratio, 0.99 ** g_reg_ratio),
     )
 
-    args.svm_boundary = None
-    if args.psp_loss_type == "dynamic" and args.delta_w_type == 'svm':
-        args.svm_boundary = torch.randn(1, (18 - args.num_mask_last) * 512 + 1,\
-            requires_grad=True, device=device)
-        g_optim.add_param_group({'params': args.svm_boundary})
+    args.svm_boundary = torch.randn(1, (18-args.num_mask_last)*512+1, device=device)
+    args.svm_boundary = args.svm_boundary / args.svm_boundary.norm()
+    args.svm_boundary.requires_grad=True
 
     # Set up output directories.
     prefix = f"{args.psp_loss_type}_{args.delta_w_type}"
@@ -93,12 +93,46 @@ def train(args):
 
         sample_z = mixing_noise(args.batch, 512, args.mixing, device)
 
-        [sampled_src, sampled_dst], loss = net(sample_z, iters=i)
+        [sampled_src, sampled_dst], loss, psp_codes = net(sample_z, iters=i, return_psp_codes=True)
 
         net.zero_grad()
+        
         loss.backward()
 
+        if i > 10 and \
+            args.psp_loss_type == "dynamic" and args.delta_w_type == 'svm':
+            # TODO: LBFGS optimizer
+            # def closure():
+            #     svm_loss = net.psp_loss_model.svm_loss(psp_codes[0], psp_codes[1])
+            #     w_optim.zero_grad()
+            #     svm_loss.backward()
+            #     print(f"SVM loss: {svm_loss}")
+            #     return svm_loss
+            #     # args.svm_boundary.grad.zero_()
+            # w_optim.step(closure)
+            # TODO: Adam Optimizer
+            def closure(iters=30, tol_threh=0.1):
+                prev_loss = 0
+                for j in range(iters):
+                    svm_loss = net.psp_loss_model.svm_loss(psp_codes[0], psp_codes[1])
+                    w_optim.zero_grad()
+                    svm_loss.backward()
+                    print(f"SVM loss: {svm_loss}")
+                    w_optim.step()
+                    if torch.abs(svm_loss - prev_loss) < tol_threh:
+                        break
+                    prev_loss = svm_loss
+            closure(iters=50, tol_threh=0.1)
+
         g_optim.step()
+        
+        # Embed the boundary of svm into training after sliding_window_size iterations
+        if i == 10 and args.psp_loss_type == "dynamic" and args.delta_w_type == 'svm':
+            w_optim = torch.optim.Adam(
+                [args.svm_boundary],
+                lr=0.005,
+                betas=(0 ** g_reg_ratio, 0.99 ** g_reg_ratio),
+            )
 
         tqdm.write(f"Clip loss: {loss}")
 
@@ -167,6 +201,11 @@ def train(args):
         # Save dynamic mean values
         plt.plot(x, net.psp_loss_model.iter_mean)
         plt.savefig(os.path.join(sample_dir, "mask_mean.png"))
+        plt.clf()
+        # Save dynamic cosine similarity
+        plt.plot(x, net.psp_loss_model.iter_sim)
+        plt.savefig(os.path.join(sample_dir, 'mask_sim.png'))
+        plt.clf()
 
 
 if __name__ == "__main__":

@@ -276,7 +276,8 @@ class ZSSGAN(torch.nn.Module):
         noise=None,
         randomize_noise=True,
         delta_w=None,
-        iters=1,
+        iters=0,
+        return_psp_codes=False,
     ):
     
         if self.training and self.auto_layer_iters > 0 and self.has_clip_loss:
@@ -309,12 +310,15 @@ class ZSSGAN(torch.nn.Module):
         if self.has_clip_loss:
             loss += torch.sum(torch.stack([self.clip_model_weights[model_name] * self.clip_loss_models[model_name](frozen_img, \
                 self.source_class, trainable_img, self.target_class) for model_name in self.clip_model_weights.keys()]))
-
+        psp_codes = None
         if self.has_psp_loss:
-            loss += self.args.psp_model_weight * \
-                self.psp_loss_model(trainable_img, frozen_img, iters=iters).mean()
-
-        return [frozen_img, trainable_img], loss
+            psp_loss, psp_codes = self.psp_loss_model(trainable_img, frozen_img, iters=iters, return_codes=True)
+            loss += self.args.psp_model_weight * psp_loss
+        
+        if return_psp_codes:
+            return [frozen_img, trainable_img], loss, psp_codes
+        else:
+            return [frozen_img, trainable_img], loss
 
     def pivot(self):
         par_frozen = dict(self.generator_frozen.named_parameters())
