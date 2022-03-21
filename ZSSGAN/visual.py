@@ -80,7 +80,7 @@ def get_samples(args, n_samples=10000):
             w_codes.append(w_code[0].detach().cpu().numpy())
             continue
         [sampled_src, sampled_dst], loss = net(sample_z)
-        img_feats = net.clip_loss_models['ViT-B/32'].get_image_features(sampled_src)
+        img_feats = net.clip_loss_models['ViT-B/16'].get_image_features(sampled_src)
         save_images(sampled_src, args.output_dir, 'sample', 1, i)
         # img_feats = torch.cat([img_feats], dim=0).detach().cpu().numpy()
         img_feats = img_feats.squeeze().detach().cpu().numpy()
@@ -91,7 +91,7 @@ def get_samples(args, n_samples=10000):
         with open(os.path.join(sample_dir, 'sample_w_codes.pkl'), 'wb') as f:
             pickle.dump(w_codes, f)
     else:
-        with open(os.path.join(sample_dir, 'samples.pkl'), 'wb') as f:
+        with open(os.path.join(sample_dir, f'{args.dataset}_samples.pkl'), 'wb') as f:
             pickle.dump(samples_vec, f)
         
 

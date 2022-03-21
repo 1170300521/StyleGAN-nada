@@ -4,6 +4,7 @@ import torchvision.transforms as transforms
 import torch.nn.functional as F
 
 import numpy as np
+import os
 
 import clip
 from PIL import Image
@@ -39,6 +40,7 @@ class CLIPLoss(torch.nn.Module):
 
         self.device = device
         self.args = args
+        self.model_name = clip_model
         self.model, clip_preprocess = clip.load(clip_model, device=self.device)
 
         # self.model.requires_grad_(False)
@@ -67,10 +69,10 @@ class CLIPLoss(torch.nn.Module):
         self.angle_loss = torch.nn.L1Loss()
         self.id_loss = DirectionLoss('cosine')
 
-        self.model_cnn, preprocess_cnn = clip.load("RN50", device=self.device)
-        self.preprocess_cnn = transforms.Compose([transforms.Normalize(mean=[-1.0, -1.0, -1.0], std=[2.0, 2.0, 2.0])] + # Un-normalize from [-1.0, 1.0] (GAN output) to [0, 1].
-                                        preprocess_cnn.transforms[:2] +                                                 # to match CLIP input scale assumptions
-                                        preprocess_cnn.transforms[4:])                                                  # + skip convert PIL to tensor
+        # self.model_cnn, preprocess_cnn = clip.load("RN50", device=self.device)
+        # self.preprocess_cnn = transforms.Compose([transforms.Normalize(mean=[-1.0, -1.0, -1.0], std=[2.0, 2.0, 2.0])] + # Un-normalize from [-1.0, 1.0] (GAN output) to [0, 1].
+        #                                 preprocess_cnn.transforms[:2] +                                                 # to match CLIP input scale assumptions
+        #                                 preprocess_cnn.transforms[4:])                                                  # + skip convert PIL to tensor
 
         self.texture_loss = torch.nn.MSELoss()
         self.pca_components = None
@@ -80,7 +82,7 @@ class CLIPLoss(torch.nn.Module):
         self.pca = self.get_pca()
 
     def get_pca(self):
-        orig_sample_path = '../weights/samples.pkl'
+        orig_sample_path = os.path.join('../weights/clip_mean/', f"{self.args.dataset}_{self.model_name[-2::]}_samples.pkl")
         with open(orig_sample_path, 'rb') as f:
             X = pickle.load(f)
             X = np.array(X)

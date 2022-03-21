@@ -1,6 +1,6 @@
 # ffhq: 1024; cat: 512; dog: 512; church: 256; horse: 256; car: 512, crop_for_cars 
 target_class="Image_1"
-output_dir="A_gen_10k-B_500"
+output_dir="invert"
 psp_alpha=0.4
 num_mask_last=10
 cuda_id=1
@@ -20,8 +20,8 @@ CUDA_VISIBLE_DEVICES=$cuda_id python visual.py --size 1024 \
                 --output_interval 50 \
                 --mixing 0.0 \
                 --save_interval 150 \
-                --clip_models "ViT-B/32" \
-                --clip_model_weights 0.0 \
+                --clip_models "ViT-B/16" \
+                --clip_model_weights 1.0 \
                 --psp_model_weight 1.0 \
                 --num_mask_last $num_mask_last \
                 --delta_w_type $delta_w_type \
