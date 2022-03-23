@@ -51,7 +51,10 @@ class CLIPLoss(torch.nn.Module):
                                               clip_preprocess.transforms[4:])                                       # + skip convert PIL to tensor
 
         self.target_direction      = None
+        self.target_image          = None
+        self.target_text           = None
         self.patch_text_directions = None
+        self.target_beta = 0.01
 
         self.patch_loss     = DirectionLoss(patch_loss_type)
         self.direction_loss = DirectionLoss(direction_loss_type)
@@ -156,13 +159,17 @@ class CLIPLoss(torch.nn.Module):
             # text_direction = target_features.mean(axis=0, keepdim=True)
             text_direction /= text_direction.norm(dim=-1, keepdim=True)
         elif self.args.source_type == 'project':
-            source_features = self.clip_mean
-            target_features = target_features.mean(axis=0, keepdim=True)
+            source_features = self.clip_mean.to(target_features.dtype).view(1, -1)
+            # target_features = target_features.mean(axis=0, keepdim=True)
             target_features /= target_features.norm(dim=-1, keepdim=True)
             source_features /= source_features.norm(dim=-1, keepdim=True)
-            sim = (target_features * source_features).sum()
-            text_direction = target_features - sim * source_features
+            sim = target_features @ source_features.t()
+
+            text_direction = (target_features - sim * source_features).mean(axis=0, keepdim=True)
             text_direction /= text_direction.norm(dim=-1, keepdim=True)
+        elif self.args.source_type == 'zero':
+            target_features = target_features.mean(axis=0, keepdim=True)
+            text_direction = target_features / target_features.norm(dim=-1, keepdim=True)
         else:
             source_features = self.clip_mean
             text_direction = (target_features - source_features).mean(axis=0, keepdim=True)
@@ -189,11 +196,13 @@ class CLIPLoss(torch.nn.Module):
             
             target_encoding = torch.cat(target_encodings, axis=0)
             target_encoding = target_encoding.mean(dim=0, keepdim=True)
+            target_encoding /= target_encoding.norm(dim=-1, keepdim=True)
+
+            self.target_image = target_encoding
 
             src_encoding = self.clip_mean
 
             if self.args.source_type == 'project':
-                target_encoding /= target_encoding.norm(dim=-1, keepdim=True)
                 src_encoding /= src_encoding.norm(dim=-1, keepdim=True)
                 sim = (target_encoding * src_encoding).sum()
                 direction = target_encoding - sim * src_encoding
@@ -276,6 +285,10 @@ class CLIPLoss(torch.nn.Module):
         return self.direction_loss(edit_direction, self.target_direction).mean()
 
     def global_clip_loss(self, img: torch.Tensor, text) -> torch.Tensor:
+        if self.target_image is not None:
+            target_encoding = self.get_image_features(img)
+            return self.direction_loss(self.target_image, target_encoding).mean()
+
         if not isinstance(text, list):
             text = [text]
             
