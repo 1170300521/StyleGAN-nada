@@ -1,3 +1,4 @@
+from genericpath import exists
 import pickle
 import torch
 import torchvision.transforms as transforms
@@ -5,6 +6,7 @@ import torch.nn.functional as F
 
 import numpy as np
 import os
+import tqdm
 
 import clip
 from PIL import Image
@@ -54,7 +56,7 @@ class CLIPLoss(torch.nn.Module):
         self.target_image          = None
         self.target_text           = None
         self.patch_text_directions = None
-        self.target_beta = 0.01
+        self.target_beta = 0.005
 
         self.patch_loss     = DirectionLoss(patch_loss_type)
         self.direction_loss = DirectionLoss(direction_loss_type)
@@ -149,12 +151,66 @@ class CLIPLoss(torch.nn.Module):
         # src /= src.norm(dim=-1, keepdim=True)
         return src
 
+    def get_prompt_features(self, word_num=50):
+        '''
+        Get text features of source class based on the samples of Domain A
+        '''
+        prompt_path = f"../weights/source_prompt/ViT_{self.model_name[-2::]}_{self.args.dataset}_{word_num}.pkl"
+        if os.path.exists(prompt_path):
+            print("Load the prompt of source class from {} !".format(prompt_path))
+            with open(prompt_path, 'rb') as f:
+                prompt_words = pickle.load(f)
+        else:
+            os.makedirs("../weights/source_prompt", exist_ok=True)
+
+            words = set(clip.simple_tokenizer.SimpleTokenizer().encoder.keys())
+            # Remove sub-words and keep intact words
+            words = {w.replace("</w>", "") for w in words}
+            word_list = list(words)
+            word_temps = ["a photo of {}".format(w) for w in word_list]
+
+            clip_mean = self.clip_mean / self.clip_mean.norm(dim=-1, keepdim=True)
+            clip_mean = clip_mean.to(torch.float16)
+
+            batch = 100
+            sim_all = []
+            for i in tqdm.tqdm(range(len(word_list) // batch), desc='Prompt'):
+                temps = word_temps[i*batch:(i+1)*batch]
+                tokens = clip.tokenize(temps).to(self.device)
+                vecs = self.model.encode_text(tokens)
+                vecs /= vecs.norm(dim=-1, keepdim=True)
+                sim = vecs @ clip_mean.t()
+                sim_all.extend(sim.flatten().tolist())
+
+            # for word in word_list:
+            #     text_features = self.get_text_features(word)
+            #     sim = (text_features @ clip_mean.t()).mean().item()
+            #     sim_all.append(sim)
+            sim_all = np.array(sim_all)
+            sort_ids = np.argsort(sim_all)[::-1].tolist()
+            prompt_words = np.array(word_list)[sort_ids[0:word_num]]
+
+            with open(prompt_path, 'wb') as f:
+                pickle.dump(prompt_words, f)
+                print("Save the prompt of source class to {} !".format(prompt_path))
+        print("Prompt words of source class:")
+        print(prompt_words)
+        source_features = []
+        for w in prompt_words:
+            vecs = self.get_text_features(w)
+            source_features.append(vecs)
+        prompt_vec = torch.stack(source_features, dim=0).mean(dim=0)
+        prompt_vec /= prompt_vec.norm(dim=-1, keepdim=True)
+        return prompt_vec
+
+
     def compute_text_direction(self, source_class: str, target_class: str) -> torch.Tensor:
-        # # TODO: Remove it
-        source_features = self.get_text_features(source_class)
+        # TODO: Remove it
         target_features = self.get_text_features(target_class)
+        self.target_text = target_features
         
         if self.args.source_type == 'source':
+            source_features = self.get_text_features(source_class)
             text_direction = (target_features - source_features).mean(axis=0, keepdim=True)
             # text_direction = target_features.mean(axis=0, keepdim=True)
             text_direction /= text_direction.norm(dim=-1, keepdim=True)
@@ -164,17 +220,23 @@ class CLIPLoss(torch.nn.Module):
             target_features /= target_features.norm(dim=-1, keepdim=True)
             source_features /= source_features.norm(dim=-1, keepdim=True)
             sim = target_features @ source_features.t()
-
             text_direction = (target_features - sim * source_features).mean(axis=0, keepdim=True)
             text_direction /= text_direction.norm(dim=-1, keepdim=True)
         elif self.args.source_type == 'zero':
             target_features = target_features.mean(axis=0, keepdim=True)
             text_direction = target_features / target_features.norm(dim=-1, keepdim=True)
-        else:
+        elif self.args.source_type == 'mean':
             source_features = self.clip_mean
             text_direction = (target_features - source_features).mean(axis=0, keepdim=True)
             # text_direction = target_features.mean(axis=0, keepdim=True)
             text_direction /= text_direction.norm(dim=-1, keepdim=True)
+        elif self.args.source_type == 'prompt':
+            source_features = self.get_prompt_features()
+            text_direction = (target_features - source_features).mean(axis=0, keepdim=True)
+            # text_direction = target_features.mean(axis=0, keepdim=True)
+            text_direction /= text_direction.norm(dim=-1, keepdim=True)
+        else:
+            raise RuntimeError("No type named {}".format(self.args.source_type))
         return text_direction
 
     def get_raw_img_features(self, imgs: str):
@@ -270,14 +332,20 @@ class CLIPLoss(torch.nn.Module):
     def compose_text_with_templates(self, text: str, templates=imagenet_templates) -> list:
         return [template.format(text) for template in templates]
    
+    def update_text_direction(self, target_encoding: torch.Tensor, source_class: str) -> torch.Tensor:
+        self.target_text = self.target_beta * target_encoding.detach().mean(dim=0, keepdim=True) + \
+            self.target_text * (1 - self.target_beta)
+        
+        text_direction = (self.target_text- self.clip_mean).mean(axis=0, keepdim=True)
+        text_direction /= text_direction.norm(dim=-1, keepdim=True)
+        return text_direction
+
     def clip_directional_loss(self, src_img: torch.Tensor, source_class: str, target_img: torch.Tensor, target_class: str) -> torch.Tensor:
+        src_encoding    = self.get_image_features(src_img)
+        target_encoding = self.get_image_features(target_img)
 
         if self.target_direction is None:
             self.target_direction = self.compute_text_direction(source_class, target_class)
-
-        src_encoding    = self.get_image_features(src_img)
-
-        target_encoding = self.get_image_features(target_img)
 
         edit_direction = (target_encoding - src_encoding)
         edit_direction /= edit_direction.clone().norm(dim=-1, keepdim=True)
