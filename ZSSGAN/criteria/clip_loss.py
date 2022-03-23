@@ -75,30 +75,22 @@ class CLIPLoss(torch.nn.Module):
         #                                 preprocess_cnn.transforms[4:])                                                  # + skip convert PIL to tensor
 
         self.texture_loss = torch.nn.MSELoss()
-        self.pca_components = None
         self.condition = None
-        self.pca_threshold = None
-        self.clip_mean = None
-        self.pca = self.get_pca()
+        self.clip_mean = self.get_clip_mean()
 
-    def get_pca(self):
+    def get_clip_mean(self):
         orig_sample_path = os.path.join('../weights/clip_mean/', f"{self.args.dataset}_{self.model_name[-2::]}_samples.pkl")
-        with open(orig_sample_path, 'rb') as f:
-            X = pickle.load(f)
-            X = np.array(X)
+        if not os.path.exists(orig_sample_path):
+            X = np.zeros((1, 512))
+        else:
+            print("Load from ", orig_sample_path)
+            with open(orig_sample_path, 'rb') as f:
+                X = pickle.load(f)
+                X = np.array(X)
         self.samples = X
-        self.clip_mean = torch.from_numpy(np.mean(X, axis=0)).float().to(self.device)
-
-        # Define a pca and train it
-        pca = PCA(n_components=self.args.pca_dim)
-        pca.fit(X)
-
-        # Get the standar deviation of samples and set threshold for each dimension
-        # threshold = np.sqrt(pca.explained_variance_) * self.alpha
-        # self.pca_threshold = torch.from_numpy(threshold).float().to(self.device)
-        # self.pca_components = torch.from_numpy(pca.components_).float().to(self.device)
-
-        return pca
+        mean =  torch.from_numpy(np.mean(X, axis=0)).float().to(self.device)
+        # return mean / mean.norm(dim=-1, keepdim=True)
+        return mean
 
     def tokenize(self, strings: list):
         return clip.tokenize(strings).to(self.device)
@@ -154,71 +146,28 @@ class CLIPLoss(torch.nn.Module):
         # src /= src.norm(dim=-1, keepdim=True)
         return src
 
-    def supress_normal_features(self, vec, is_target=False):
-        '''
-        Supress normal features of the given vector based on original StyleGAN
-
-        Params:
-            vec: the vector to be supressed
-        '''
-        if self.args.supress == 0:
-            return vec
-        elif self.args.supress == 1:
-            if self.condition is None or isinstance(self.condition, np.ndarray):
-                self.condition = torch.from_numpy(self.condition).unsqueeze(0).float().to(vec.device)
-                print("The number of style and special attrs: ", self.condition.sum())
-
-            return vec
-        elif self.args.supress == 2:
-            if self.clip_mean is not None:
-                vec = vec - self.clip_mean
-            vec_pca = vec @ self.pca_components.t()
-            if self.condition is None:
-                self.condition = (vec_pca[0].abs() > self.pca_threshold).unsqueeze(0).float()
-            
-            return vec_pca * self.condition if is_target else vec_pca
-        else:
-            raise RuntimeError(f"The choice {self.args.supress} is illegal! Please choose it among 0, 1, 2.")
-
-    def keep_normal_features(self, vec):
-        '''
-        Keep normal features of the given vector based on original StyleGAN
-        '''
-        if self.args.supress == 0:
-            return vec * 0
-        elif self.args.supress == 1:
-            return vec * (1 - self.condition)
-        elif self.args.supress == 2:
-            if self.clip_mean is not None:
-                vec = vec - self.clip_mean
-            vec_pca = vec @ self.pca_components.t()
-#            return vec_pca * (1 - self.condition)
-            return vec_pca
-        else:
-            raise RuntimeError(f"The choice {self.args.supress} is illegal! Please choose it among 0, 1, 2.")
-
-    def get_pca_features(self, vec):
-        '''
-        Convert CLIP features to PCA features
-        '''
-        if self.clip_mean is None:
-            return vec
-        vec = vec - self.clip_mean
-        return vec @ self.pca_components.t()
-
     def compute_text_direction(self, source_class: str, target_class: str) -> torch.Tensor:
-        source_features = self.clip_mean
+        # # TODO: Remove it
+        source_features = self.get_text_features(source_class)
         target_features = self.get_text_features(target_class)
         
-        # Supress normal features and keep special features in the text feature
-        # target_features = self.supress_normal_features(target_features, is_target=True)
-        # source_features = self.supress_normal_features(source_features, is_target=True)
-
-        # source_features = 0
-        text_direction = (target_features - source_features).mean(axis=0, keepdim=True)
-        # text_direction = target_features.mean(axis=0, keepdim=True)
-        text_direction /= text_direction.norm(dim=-1, keepdim=True)
-
+        if self.args.source_type == 'source':
+            text_direction = (target_features - source_features).mean(axis=0, keepdim=True)
+            # text_direction = target_features.mean(axis=0, keepdim=True)
+            text_direction /= text_direction.norm(dim=-1, keepdim=True)
+        elif self.args.source_type == 'project':
+            source_features = self.clip_mean
+            target_features = target_features.mean(axis=0, keepdim=True)
+            target_features /= target_features.norm(dim=-1, keepdim=True)
+            source_features /= source_features.norm(dim=-1, keepdim=True)
+            sim = (target_features * source_features).sum()
+            text_direction = target_features - sim * source_features
+            text_direction /= text_direction.norm(dim=-1, keepdim=True)
+        else:
+            source_features = self.clip_mean
+            text_direction = (target_features - source_features).mean(axis=0, keepdim=True)
+            # text_direction = target_features.mean(axis=0, keepdim=True)
+            text_direction /= text_direction.norm(dim=-1, keepdim=True)
         return text_direction
 
     def get_raw_img_features(self, imgs: str):
@@ -239,16 +188,19 @@ class CLIPLoss(torch.nn.Module):
                 target_encodings.append(encoding)
             
             target_encoding = torch.cat(target_encodings, axis=0)
-            # target_encoding = self.supress_normal_features(target_encoding, is_target=True)
             target_encoding = target_encoding.mean(dim=0, keepdim=True)
 
-#            src_encoding = self.get_image_features(source_images)
-#            src_encoding = src_encoding.mean(dim=0, keepdim=True)
-
             src_encoding = self.clip_mean
-            # src_encoding = self.supress_normal_features(src_encoding, is_target=True)
-            direction = target_encoding - src_encoding
-            direction /= direction.norm(dim=-1, keepdim=True)
+
+            if self.args.source_type == 'project':
+                target_encoding /= target_encoding.norm(dim=-1, keepdim=True)
+                src_encoding /= src_encoding.norm(dim=-1, keepdim=True)
+                sim = (target_encoding * src_encoding).sum()
+                direction = target_encoding - sim * src_encoding
+                direction /= direction.norm(dim=-1, keepdim=True)
+            else:
+                direction = target_encoding - src_encoding
+                direction /= direction.norm(dim=-1, keepdim=True)
 
         return direction
 
@@ -264,7 +216,6 @@ class CLIPLoss(torch.nn.Module):
                 target_encodings.append(encoding)
             
             target_encoding = torch.cat(target_encodings, axis=0)
-            # target_encoding = self.supress_normal_features(target_encoding, is_target=True)
             target_encoding = target_encoding.mean(dim=0, keepdim=True)
 
             source_encodings = []
@@ -277,7 +228,6 @@ class CLIPLoss(torch.nn.Module):
                 source_encodings.append(encoding)
             
             source_encoding = torch.cat(source_encodings, axis=0)
-            # target_encoding = self.supress_normal_features(target_encoding, is_target=True)
             source_encoding = source_encoding.mean(dim=0, keepdim=True)
             direction = target_encoding - source_encoding
             direction /= direction.norm(dim=-1, keepdim=True)
@@ -317,28 +267,8 @@ class CLIPLoss(torch.nn.Module):
             self.target_direction = self.compute_text_direction(source_class, target_class)
 
         src_encoding    = self.get_image_features(src_img)
-        # src_encoding = self.supress_normal_features(src_encoding, is_target=True)
 
         target_encoding = self.get_image_features(target_img)
-        # target_encoding = self.supress_normal_features(target_encoding, is_target=True)
-
-        edit_direction = (target_encoding - src_encoding)
-        edit_direction /= edit_direction.clone().norm(dim=-1, keepdim=True)
-        
-        return self.direction_loss(edit_direction, self.target_direction).mean()
-
-    def pca_directional_loss(self, src_img: torch.Tensor, source_class: str, target_img: torch.Tensor, target_class: str) -> torch.Tensor:
-        if self.target_direction is None:
-            self.target_direction = self.compute_text_direction(source_class, target_class)
-
-        # if self.args.use_mean:
-        #     src_encoding = self.clip_mean
-        # else:
-        src_encoding    = self.get_image_features(src_img)
-        src_encoding = self.get_pca_features(src_encoding)
-
-        target_encoding = self.get_image_features(target_img)
-        target_encoding = self.get_pca_features(target_encoding)
 
         edit_direction = (target_encoding - src_encoding)
         edit_direction /= edit_direction.clone().norm(dim=-1, keepdim=True)
@@ -355,19 +285,6 @@ class CLIPLoss(torch.nn.Module):
         logits_per_image, _ = self.model(image, tokens)
 
         return (1. - logits_per_image / 100).mean()
-
-    def adaptive_global_clip_loss(self, img: torch.Tensor, text) -> torch.Tensor:
-        if self.alpha == 0:
-            return self.global_clip_loss(img, text)
-        text_features = self.get_text_features(text, templates=['{}'])
-        img_features = self.get_image_features(img)
-
-        text_features = text_features - self.pca_mean.unsqueeze(0)
-        text_features = text_features @ self.pca_cov.t()
-        img_features = img_features - self.pca_mean.unsqueeze(0)
-        img_features = img_features @ self.pca_cov.t()
-        logits_per_img = img_features @ text_features.t()
-        return (1. - logits_per_img).mean()
         
     def random_patch_centers(self, img_shape, num_patches, size):
         batch_size, channels, height, width = img_shape

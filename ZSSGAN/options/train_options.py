@@ -86,21 +86,6 @@ class TrainOptions(object):
         )
 
         self.parser.add_argument(
-            "--supress",
-            type=int,
-            default=0,
-            help="How to supress source class; 0 reps no, 1 reps using CLIP space \
-                class, 2 reps using PCA space.",
-        )
-
-        self.parser.add_argument(
-            "--pca_dim",
-            type=int,
-            default=None,
-            help="The number of dimensions used for PCA, and None reps using all dimensions"
-        )
-
-        self.parser.add_argument(
             "--sliding_window_size",
             type=int,
             default=1,
@@ -183,6 +168,12 @@ class TrainOptions(object):
             '--dataset',
             default='ffhq',
             help = "Pretraining dataset"
+        )
+
+        self.parser.add_argument(
+            '--source_type',
+            default='mean',
+            help="Source type computing the target direction."
         )
 
         # Used for manual layer choices. Leave as None to use paper layers.

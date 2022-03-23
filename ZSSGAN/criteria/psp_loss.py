@@ -44,7 +44,7 @@ class PSPLoss(torch.nn.Module):
         self.svm_C = 1
 
     def get_source_mean(self):
-        source_path = "/home/ybyb/CODE/StyleGAN-nada/results/invert/A_gen_w.npy"
+        source_path = f"../weights/psp_source/{self.args.dataset}_A_gen_w.npy"
         source_codes = np.load(source_path)
         unmasked_num = 18
         if self.args.num_mask_last > 0:

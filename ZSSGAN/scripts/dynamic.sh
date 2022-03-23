@@ -20,8 +20,6 @@ CUDA_VISIBLE_DEVICES=$cuda_id python train.py  \
                 --source_class "photo" \
                 --target_class "$target_class" \
                 --alpha 0 \
-                --supress 0 \
-                --pca_dim 512 \
                 --auto_layer_k 18 \
                 --auto_layer_iters 0 --auto_layer_batch 8 \
                 --output_interval 50 \

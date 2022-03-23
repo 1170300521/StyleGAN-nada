@@ -1,7 +1,7 @@
 # ffhq: 1024; cat: 512; dog: 512; church: 256; horse: 256; car: 512, crop_for_cars 
-target_class="Image_1"
+target_class="026_970_491_4k_jefrey-yonathan-selermun-by-jefreyang_00.png"
 output_dir="ViT-B-16+32"
-psp_alpha=0.3
+psp_alpha=0.5
 num_mask_last=10
 cuda_id=1
 delta_w_type='mean'
@@ -16,8 +16,6 @@ CUDA_VISIBLE_DEVICES=$cuda_id python train.py  \
                 --source_class "photo" \
                 --target_class  "$target_class" \
                 --alpha 0 \
-                --supress 0 \
-                --pca_dim 512 \
                 --auto_layer_k 18 \
                 --auto_layer_iters 0 --auto_layer_batch 8 \
                 --output_interval 50 \
@@ -29,7 +27,7 @@ CUDA_VISIBLE_DEVICES=$cuda_id python train.py  \
                 --lambda_direction 1.0 \
                 --lambda_global 0.0 \
                 --lambda_texture 0.0 \
-                --style_img_dir ../img/mind/1.png
+                --style_img_dir ../img/aligned/026_970_491_4k_jefrey-yonathan-selermun-by-jefreyang_00.png
 
 CUDA_VISIBLE_DEVICES=$cuda_id python visual.py --size 1024 \
                 --batch 2 \
@@ -61,8 +59,6 @@ CUDA_VISIBLE_DEVICES=$cuda_id python train.py  \
                 --source_class "photo" \
                 --target_class "$target_class" \
                 --alpha 0 \
-                --supress 0 \
-                --pca_dim 512 \
                 --auto_layer_k 18 \
                 --auto_layer_iters 0 --auto_layer_batch 8 \
                 --output_interval 50 \
@@ -77,4 +73,4 @@ CUDA_VISIBLE_DEVICES=$cuda_id python train.py  \
                 --lambda_global 0.0 \
                 --lambda_texture 0.0 \
                 --delta_w_type $delta_w_type \
-                --style_img_dir ../img/mind/1.png \
+                --style_img_dir ../img/aligned/026_970_491_4k_jefrey-yonathan-selermun-by-jefreyang_00.png \
