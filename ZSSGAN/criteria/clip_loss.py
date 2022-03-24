@@ -166,7 +166,7 @@ class CLIPLoss(torch.nn.Module):
             words = set(clip.simple_tokenizer.SimpleTokenizer().encoder.keys())
             # Remove sub-words and keep intact words
             words = {w.replace("</w>", "") for w in words}
-            word_list = list(words)
+            word_list = [w for w in words if len(w) == len(w.encode())]
             word_temps = ["a photo of {}".format(w) for w in word_list]
 
             clip_mean = self.clip_mean / self.clip_mean.norm(dim=-1, keepdim=True)
@@ -182,10 +182,6 @@ class CLIPLoss(torch.nn.Module):
                 sim = vecs @ clip_mean.t()
                 sim_all.extend(sim.flatten().tolist())
 
-            # for word in word_list:
-            #     text_features = self.get_text_features(word)
-            #     sim = (text_features @ clip_mean.t()).mean().item()
-            #     sim_all.append(sim)
             sim_all = np.array(sim_all)
             sort_ids = np.argsort(sim_all)[::-1].tolist()
             prompt_words = np.array(word_list)[sort_ids[0:word_num]]
@@ -202,7 +198,6 @@ class CLIPLoss(torch.nn.Module):
         prompt_vec = torch.stack(source_features, dim=0).mean(dim=0)
         prompt_vec /= prompt_vec.norm(dim=-1, keepdim=True)
         return prompt_vec
-
 
     def compute_text_direction(self, source_class: str, target_class: str) -> torch.Tensor:
         # TODO: Remove it
@@ -232,6 +227,12 @@ class CLIPLoss(torch.nn.Module):
             text_direction /= text_direction.norm(dim=-1, keepdim=True)
         elif self.args.source_type == 'prompt':
             source_features = self.get_prompt_features()
+            text_direction = (target_features - source_features).mean(axis=0, keepdim=True)
+            # text_direction = target_features.mean(axis=0, keepdim=True)
+            text_direction /= text_direction.norm(dim=-1, keepdim=True)
+        elif self.args.source_type == 'invert':
+            source_features = self.get_text_features(source_class)
+            target_features = self.get_prompt_features()
             text_direction = (target_features - source_features).mean(axis=0, keepdim=True)
             # text_direction = target_features.mean(axis=0, keepdim=True)
             text_direction /= text_direction.norm(dim=-1, keepdim=True)
