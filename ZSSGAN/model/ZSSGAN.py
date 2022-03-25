@@ -1,18 +1,15 @@
-from ast import arg
 import sys
 import os
-from turtle import pd
+import tqdm
+from utils.file_utils import save_images
+
+from utils.training_utils import mixing_noise
 
 sys.path.insert(0, os.path.abspath('../'))
 
 
 import torch
-import torchvision.transforms as transforms
 
-import numpy as np
-import copy
-
-from functools import partial
 
 from ZSSGAN.model.sg2_model import Generator, Discriminator
 from ZSSGAN.criteria.clip_loss import CLIPLoss 
@@ -188,6 +185,10 @@ class ZSSGAN(torch.nn.Module):
                                     for model_name in args.clip_models}
 
             self.clip_model_weights = {model_name: weight for model_name, weight in zip(args.clip_models, args.clip_model_weights)}
+            if self.args.source_type == 'online-prompt':
+                self.args.online_clip_mean = {model_name: torch.zeros(512, dtype=torch.float16, device=self.device)\
+                     for model_name in self.args.clip_models}
+                self.get_samples_clip_mean(num=1000)
         self.has_psp_loss = args.psp_model_weight > 0
         if self.has_psp_loss:
             self.psp_loss_model = PSPLoss(self.device, args=args)
@@ -207,6 +208,21 @@ class ZSSGAN(torch.nn.Module):
 
         if args.target_img_list is not None and self.has_clip_loss:
             self.set_img2img_direction()
+    
+    def get_samples_clip_mean(self, num=1000, debug=False):
+        '''
+        Get mean value of frozen gan's samples
+        '''
+        with torch.no_grad():
+            for i in tqdm.tqdm(range(num // self.args.batch)):
+                sample_z = mixing_noise(self.args.batch, 512, self.args.mixing, self.device)
+                sampled_src = self.generator_frozen(sample_z, truncation=self.args.sample_truncation)[0]
+                for k in self.args.online_clip_mean.keys():
+                    self.args.online_clip_mean[k] += self.clip_loss_models[k].get_image_features(sampled_src).sum(dim=0)
+                if debug:
+                    save_images(sampled_src, self.args.output_dir, 'sample', 1, i)
+            for k in self.args.online_clip_mean.keys():
+                self.args.online_clip_mean[k] /= num
 
     def set_img2img_direction(self):
         with torch.no_grad():

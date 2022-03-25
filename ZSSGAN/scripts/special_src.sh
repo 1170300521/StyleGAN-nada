@@ -1,14 +1,14 @@
 # ffhq stylegan2-ffhq-config-f : 1024; cat: 512; dog: 512; church: 256; horse: 256; car: 512, crop_for_cars 
 CUDA_VISIBLE_DEVICES=0 python train.py  \
                 --batch 2  --dataset "ffhq" \
-                --n_sample 4 --output_dir "ViT-B-16+32-prompt" \
+                --n_sample 4 --output_dir "ViT-B-16+32-online-prompt" \
                 --lr 0.002 \
-                --frozen_gen_ckpt ../weights/stylegan2-ffhq-config-f.pt \
+                --frozen_gen_ckpt ../results/demo_ffhq/photo+Sketch/ViT-B-16+32-prompt/checkpoint/000300.pt \
                 --psp_path ../weights/psp_ffhq_encode.pt \
                 --iter 501 \
-                --source_class "photo" \
-                --target_class "Sketch" \
-                --source_type "prompt" \
+                --source_class "Sketch" \
+                --target_class "Fernando Botero Painting" \
+                --source_type "online-prompt" \
                 --auto_layer_k 18 \
                 --auto_layer_iters 0 --auto_layer_batch 8 \
                 --output_interval 50 \
@@ -22,4 +22,4 @@ CUDA_VISIBLE_DEVICES=0 python train.py  \
                 --lambda_texture 0.0 \
                 --lambda_within 0 \
                 --lambda_across 0.0 \
-                --style_img_dir ../img/style/waterbuck.jpg \
+                # --style_img_dir ../img/style/waterbuck.jpg \

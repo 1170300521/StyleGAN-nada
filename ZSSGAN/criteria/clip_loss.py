@@ -199,6 +199,44 @@ class CLIPLoss(torch.nn.Module):
         prompt_vec /= prompt_vec.norm(dim=-1, keepdim=True)
         return prompt_vec
 
+    def get_online_prompt_features(self, word_num=50):
+        prompt_path = os.path.join(self.args.output_dir, f"ViT_{self.model_name[-2::]}_source_clip_mean.pkl")
+        words = set(clip.simple_tokenizer.SimpleTokenizer().encoder.keys())
+        # Remove sub-words and keep intact words
+        words = {w.replace("</w>", "") for w in words}
+        word_list = [w for w in words if len(w) == len(w.encode())]
+        word_temps = ["a photo of {}".format(w) for w in word_list]
+
+        clip_mean = self.args.online_clip_mean[self.model_name]
+        clip_mean /= clip_mean.norm(dim=-1, keepdim=True)
+        clip_mean = clip_mean.to(torch.float16)
+
+        batch = 100
+        sim_all = []
+        for i in tqdm.tqdm(range(len(word_list) // batch), desc='Prompt'):
+            temps = word_temps[i*batch:(i+1)*batch]
+            tokens = clip.tokenize(temps).to(self.device)
+            vecs = self.model.encode_text(tokens)
+            vecs /= vecs.norm(dim=-1, keepdim=True)
+            sim = vecs @ clip_mean.t()
+            sim_all.extend(sim.flatten().tolist())
+
+        sim_all = np.array(sim_all)
+        sort_ids = np.argsort(sim_all)[::-1].tolist()
+        prompt_words = np.array(word_list)[sort_ids[0:word_num]]
+        with open(prompt_path, 'wb') as f:
+                pickle.dump(prompt_words, f)
+                print("Save the prompt of source class to {} !".format(prompt_path))
+        print("Prompt words of source class:")
+        print(prompt_words)
+        source_features = []
+        for w in prompt_words:
+            vecs = self.get_text_features(w)
+            source_features.append(vecs)
+        prompt_vec = torch.stack(source_features, dim=0).mean(dim=0)
+        prompt_vec /= prompt_vec.norm(dim=-1, keepdim=True)
+        return prompt_vec
+
     def compute_text_direction(self, source_class: str, target_class: str) -> torch.Tensor:
         # TODO: Remove it
         target_features = self.get_text_features(target_class)
@@ -206,6 +244,7 @@ class CLIPLoss(torch.nn.Module):
         
         if self.args.source_type == 'source':
             source_features = self.get_text_features(source_class)
+            print(source_features.mean(0) @ target_features.mean(0).t())
             text_direction = (target_features - source_features).mean(axis=0, keepdim=True)
             # text_direction = target_features.mean(axis=0, keepdim=True)
             text_direction /= text_direction.norm(dim=-1, keepdim=True)
@@ -230,11 +269,26 @@ class CLIPLoss(torch.nn.Module):
             text_direction = (target_features - source_features).mean(axis=0, keepdim=True)
             # text_direction = target_features.mean(axis=0, keepdim=True)
             text_direction /= text_direction.norm(dim=-1, keepdim=True)
-        elif self.args.source_type == 'invert':
-            source_features = self.get_text_features(source_class)
-            target_features = self.get_prompt_features()
+        elif self.args.source_type == 'online-prompt':
+            source_features = self.get_online_prompt_features()
             text_direction = (target_features - source_features).mean(axis=0, keepdim=True)
             # text_direction = target_features.mean(axis=0, keepdim=True)
+            text_direction /= text_direction.norm(dim=-1, keepdim=True)
+        elif self.args.source_type == 'chosen':
+            source_features = self.get_prompt_features().mean(axis=0)
+            target_features = target_features.mean(axis=0)
+            sort_ids = source_features.abs().argsort()
+            select_ids = sort_ids[-int(0.3 * len(sort_ids)):]
+            target_features[select_ids] = 0
+            text_direction = target_features / target_features.norm()
+            text_direction = text_direction.view(1, -1)
+        elif self.args.source_type == 'prompt-project':
+            source_features = self.get_prompt_features()
+            sim_m = target_features @ source_features.t()
+            sim = torch.diag(sim_m).view(-1, 1)
+            print(sim)
+            print(source_features.mean(0) @ target_features.mean(0).t())
+            text_direction = (target_features - sim * source_features).mean(axis=0, keepdim=True)
             text_direction /= text_direction.norm(dim=-1, keepdim=True)
         else:
             raise RuntimeError("No type named {}".format(self.args.source_type))

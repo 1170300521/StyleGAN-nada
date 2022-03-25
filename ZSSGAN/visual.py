@@ -64,15 +64,16 @@ def get_clip_samples(args, n_samples=10000, debug=False):
 
     net.eval()
     samples_vec = {k: [] for k in net.clip_loss_models.keys()}
-    for i in tqdm(range(n_samples)):
-        sample_z = mixing_noise(1, 512, args.mixing, device)
-        [sampled_src, _], _ = net(sample_z)
-        for k in net.clip_loss_models.keys():
-            img_feats = net.clip_loss_models[k].get_image_features(sampled_src)
-            img_feats = img_feats.squeeze().detach().cpu().numpy()
-            samples_vec[k].append(img_feats)
-        if debug:
-            save_images(sampled_src, args.output_dir, 'sample', 1, i)
+    with torch.no_grad():
+        for i in tqdm(range(n_samples)):
+            sample_z = mixing_noise(1, 512, args.mixing, device)
+            [sampled_src, _], _ = net(sample_z, truncation=args.sample_truncation)
+            for k in net.clip_loss_models.keys():
+                img_feats = net.clip_loss_models[k].get_image_features(sampled_src)
+                img_feats = img_feats.squeeze().detach().cpu().numpy()
+                samples_vec[k].append(img_feats)
+            if debug:
+                save_images(sampled_src, args.output_dir, 'sample', 1, i)
     
     for k in samples_vec.keys():
         with open(os.path.join(sample_dir, f'{args.dataset}_{k[-2::]}_samples.pkl'), 'wb') as f:
