@@ -512,6 +512,9 @@ class CLIPLoss(torch.nn.Module):
 
     def forward(self, src_img: torch.Tensor, source_class: str, target_img: torch.Tensor, target_class: str, texture_image: torch.Tensor = None):
         clip_loss = 0.0
+        if self.args.dataset == 'car':
+            target_img = target_img[:, :, 64:448, :].contiguous()
+            src_img = src_img[:, :, 64:448, :].contiguous()
 
         if self.lambda_global:
             clip_loss += self.lambda_global * self.global_clip_loss(target_img, [f"a {target_class}"])
