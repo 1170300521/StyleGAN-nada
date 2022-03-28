@@ -2,7 +2,7 @@
 target_class="Image_1"
 output_dir="CLIP_samples"
 psp_alpha=0.4
-num_mask_last=10
+num_keep_first=7
 cuda_id=0
 delta_w_type='svm'
 
@@ -23,7 +23,7 @@ delta_w_type='svm'
 #                 --clip_models "ViT-B/16" \
 #                 --clip_model_weights 1.0 \
 #                 --psp_model_weight 1.0 \
-#                 --num_mask_last $num_mask_last \
+#                 --num_keep_first $num_keep_first \
 #                 --delta_w_type $delta_w_type \
 
 CUDA_VISIBLE_DEVICES=$cuda_id python visual.py --size 512\
@@ -44,7 +44,7 @@ CUDA_VISIBLE_DEVICES=$cuda_id python visual.py --size 512\
                 --clip_models "ViT-B/16" "ViT-B/32" \
                 --clip_model_weights 1.0 1.0 \
                 --psp_model_weight 0.0 \
-                --num_mask_last $num_mask_last \
+                --num_keep_first $num_keep_first \
                 --delta_w_type $delta_w_type \
 
 CUDA_VISIBLE_DEVICES=$cuda_id python visual.py --size 512\
@@ -65,7 +65,7 @@ CUDA_VISIBLE_DEVICES=$cuda_id python visual.py --size 512\
                 --clip_models "ViT-B/16" "ViT-B/32" \
                 --clip_model_weights 1.0 1.0 \
                 --psp_model_weight 0.0 \
-                --num_mask_last $num_mask_last \
+                --num_keep_first $num_keep_first \
                 --delta_w_type $delta_w_type \
 
 CUDA_VISIBLE_DEVICES=$cuda_id python visual.py --size 512\
@@ -86,7 +86,7 @@ CUDA_VISIBLE_DEVICES=$cuda_id python visual.py --size 512\
                 --clip_models "ViT-B/16" "ViT-B/32" \
                 --clip_model_weights 1.0 1.0 \
                 --psp_model_weight 0.0 \
-                --num_mask_last $num_mask_last \
+                --num_keep_first $num_keep_first \
                 --delta_w_type $delta_w_type \
 
 CUDA_VISIBLE_DEVICES=$cuda_id python visual.py --size 256\
@@ -107,5 +107,5 @@ CUDA_VISIBLE_DEVICES=$cuda_id python visual.py --size 256\
                 --clip_models "ViT-B/16" "ViT-B/32" \
                 --clip_model_weights 1.0 1.0 \
                 --psp_model_weight 0.0 \
-                --num_mask_last $num_mask_last \
+                --num_keep_first $num_keep_first \
                 --delta_w_type $delta_w_type \

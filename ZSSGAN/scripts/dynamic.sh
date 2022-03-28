@@ -1,8 +1,8 @@
 # ffhq: 1024; cat: 512; dog: 512; church: 256; horse: 256; car: 512, crop_for_cars 
-target_class="A sketch with black pencil"
-output_dir="ViT-B-16+32-global"
-psp_alpha=0.7
-num_mask_last=10
+target_class="Image_1"
+output_dir="ViT-B-16+32-mean"
+psp_alpha=0.4
+num_keep_first=7
 cuda_id=1
 psp_loss_type="dynamic"
 lambda_constrain=0
@@ -26,17 +26,17 @@ CUDA_VISIBLE_DEVICES=$cuda_id python train.py  \
                 --auto_layer_iters 0 --auto_layer_batch 8 \
                 --output_interval 50 \
                 --mixing 0.0 \
-                --save_interval 1000 \
+                --save_interval 300 \
                 --clip_models "ViT-B/32" "ViT-B/16" \
                 --psp_loss_type $psp_loss_type \
                 --clip_model_weights 1.0 1.0 \
                 --psp_model_weight 2 \
-                --num_mask_last $num_mask_last \
+                --num_keep_first $num_keep_first \
                 --psp_alpha $psp_alpha \
-                --lambda_direction 0.0 \
+                --lambda_direction 1.0 \
                 --lambda_constrain $lambda_constrain \
-                --lambda_global 1.0 \
+                --lambda_global 0.0 \
                 --lambda_texture 0.0 \
                 --sliding_window_size $sliding_window_size \
                 --delta_w_type $delta_w_type \
-                # --style_img_dir ../img/mind/12.png \
+                --style_img_dir ../img/mind/1.png \

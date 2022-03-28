@@ -1,3 +1,4 @@
+import math
 import numpy as np
 from sklearn import svm
 
@@ -41,8 +42,9 @@ def train_boundary(pos_codes, neg_codes, split_ratio=0.7):
     return a / np.linalg.norm(a)
 
 def get_delta_w(pos_path, neg_path, output_path, delta_w_type='svm', args=None):
-    pos_codes = np.load(pos_path).reshape((-1, 18, 512))[:, 0:(18-args.num_mask_last)]
-    neg_codes = np.load(neg_path).reshape((-1, 18, 512))[:, 0:(18-args.num_mask_last)]
+    tol_num = int(math.log(args.size, 2)) * 2 - 2
+    pos_codes = np.load(pos_path).reshape((-1, tol_num, 512))[:, 0:args.num_keep_first]
+    neg_codes = np.load(neg_path).reshape((-1, tol_num, 512))[:, 0:args.num_keep_first]
     chosen_num = min(500, len(neg_codes))
     pos_num = min(10000, len(pos_codes))
     # np.save("/home/ybyb/CODE/StyleGAN-nada/results/demo_ffhq/photo+Image_1/test/mean_delta_w.npy", (pos_codes.mean(0) - neg_codes.mean(0)))
@@ -57,8 +59,8 @@ def get_delta_w(pos_path, neg_path, output_path, delta_w_type='svm', args=None):
         a = a / np.linalg.norm(a)
     else:
         raise RuntimeError(f"No type namely {delta_w_type}!")
-    tmp = np.zeros((18, 512))
-    tmp[0:(18-args.num_mask_last)] = a.reshape((-1, 512))
+    tmp = np.zeros((tol_num, 512))
+    tmp[0:args.num_keep_first] = a.reshape((-1, 512))
     np.save(output_path, tmp)
 
 if __name__ == "__main__":

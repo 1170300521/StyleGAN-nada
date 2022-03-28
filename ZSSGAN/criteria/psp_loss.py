@@ -1,4 +1,5 @@
 import os
+import math
 import torch
 import torchvision.transforms as transforms
 import torch.nn.functional as F
@@ -21,6 +22,10 @@ class PSPLoss(torch.nn.Module):
 
         self.device = device
         self.args = args
+        self.n_latent = int(math.log(args.size, 2)) * 2 - 2
+
+        self.model = pSp(self.args.psp_path, device, output_size=args.size, has_decoder=True)
+        self.model.to(device)
 
         # Moving Average Coefficient
         self.beta = 0.02
@@ -30,11 +35,9 @@ class PSPLoss(torch.nn.Module):
         self.svm_target = []
         self.target_pos = 0
 
-        self.model = pSp(self.args.psp_path, device, output_size=args.size, has_decoder=False)
-        self.model.to(device)
-
+        resize = (192, 256) if self.args.dataset == 'car' else (256, 256)
         self.psp_preprocess = transforms.Compose([transforms.Normalize(mean=[-1.0, -1.0, -1.0], std=[2.0, 2.0, 2.0]),  # Un-normalize from [-1.0, 1.0] (GAN output) to [0, 1].]
-                                    transforms.Resize((256, 256)),
+                                    transforms.Resize(resize),
                                     transforms.Normalize([0.5, 0.5, 0.5], [0.5, 0.5, 0.5])])
         self.target_direction = self.get_target_direction()
         self.direction_loss = DirectionLoss('cosine')
@@ -44,13 +47,17 @@ class PSPLoss(torch.nn.Module):
         self.svm_C = 1
 
     def get_source_mean(self):
-        source_path = f"../weights/psp_source/{self.args.dataset}_A_gen_w.npy"
-        source_codes = np.load(source_path)
-        unmasked_num = 18
-        if self.args.num_mask_last > 0:
-            unmasked_num = 18 - self.args.num_mask_last
+        source_path = f"../weights/{self.model.psp_encoder}_source/{self.args.dataset}_A_gen_w.npy"
+        if os.path.exists(source_path):
+            source_codes = np.load(source_path)
+        else:
+            source_codes = np.zeros((1, self.n_latent, 512))
+            print(f"There is NO file named {source_path} !")
+        unmasked_num = self.n_latent
+        if self.args.num_keep_first > 0:
+            unmasked_num = self.args.num_keep_first
             unmasked_num = max(unmasked_num, 1)
-            source_codes = source_codes.reshape((-1, 18, 512))[:, 0:unmasked_num]
+            source_codes = source_codes.reshape((-1, self.n_latent, 512))[:, 0:unmasked_num]
         source_codes = torch.from_numpy(source_codes).to(self.device).float().view(-1, unmasked_num*512)
         return source_codes.mean(dim=0, keepdim=True), source_codes.cpu().numpy()
 
@@ -61,10 +68,10 @@ class PSPLoss(torch.nn.Module):
         if os.path.exists(delta_w_path):
             delta_w = np.load(delta_w_path)
         else:
-            delta_w = np.ones((18, 512))
-        unmasked_num = 18
-        if self.args.num_mask_last > 0:
-            unmasked_num = 18 - self.args.num_mask_last
+            delta_w = np.ones((self.n_latent, 512))
+        unmasked_num = self.n_latent
+        if self.args.num_keep_first > 0:
+            unmasked_num = self.args.args.num_keep_first
             unmasked_num = max(unmasked_num, 1)
             delta_w = delta_w[0: unmasked_num]
         
@@ -88,7 +95,7 @@ class PSPLoss(torch.nn.Module):
         images = self.psp_preprocess(images)
         encodings, invert_img = self.model(images)
         # encodings = encodings[:, -1:]
-        encodings = encodings.view(images.size(0), -1)
+        encodings = encodings.reshape(images.size(0), -1)
 
         # TODO: different from clip encodings, normalize may be harmful
         if norm:
@@ -230,12 +237,15 @@ class PSPLoss(torch.nn.Module):
         return loss
 
     def forward(self, target_imgs, source_imgs, iters=0, return_codes=False):
+        if self.args.dataset == 'car':
+            target_imgs = target_imgs[:, :, 64:448, :].contiguous()
+            source_imgs = source_imgs[:, :, 64:448, :].contiguous()
         target_encodings, _ = self.get_image_features(target_imgs)
         source_encodings, _ = self.get_image_features(source_imgs)
 
         # Mask w+ codes controlling style and fine details
-        if self.args.num_mask_last > 0:
-            keep_num = (18 - self.args.num_mask_last) * 512
+        if self.args.num_keep_first > 0:
+            keep_num = self.args.num_keep_first * 512
             target_encodings = target_encodings[:, 0:keep_num]
             source_encodings = source_encodings[:, 0:keep_num]
         

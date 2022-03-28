@@ -79,7 +79,7 @@ def get_clip_samples(args, n_samples=10000, debug=False):
         with open(os.path.join(sample_dir, f'{args.dataset}_{k[-2::]}_samples.pkl'), 'wb') as f:
             pickle.dump(samples_vec[k], f)
 
-def get_psp_codes(args, n_samples=10000, debug=False):
+def get_psp_codes(args, n_samples=10000, debug=True):
     '''
     Sample images from GAN and embed them into w+ space
     '''
@@ -93,6 +93,8 @@ def get_psp_codes(args, n_samples=10000, debug=False):
             sample_z = mixing_noise(2, 512, args.mixing, device)
             [sampled_src, _], _ = net(sample_z)
             img = net.psp_loss_model.psp_preprocess(sampled_src)
+            if args.dataset == 'car':
+                img = img[:, :, 64:448, :]
             codes, invert_img = net.psp_loss_model.get_image_features(img, norm=False)
             codes = codes.detach().cpu().numpy()
             A_codes.append(codes)
@@ -100,8 +102,9 @@ def get_psp_codes(args, n_samples=10000, debug=False):
             if debug:
                 save_images(sampled_src, args.output_dir, 'src', 2, i)
                 save_images(invert_img, args.output_dir, 'invert', 2, i)
-
-    np.save(f'../weights/psp_source/{args.dataset}_A_gen_w.npy', np.concatenate(A_codes, axis=0))
+    os.makedirs(f'../weights/{net.psp_loss_model.psp_encoder}_source/', exist_ok=True)
+    print(f'Save w+ codes to ../weights/{net.psp_loss_model.psp_encoder}_source/{args.dataset}_A_gen_w.npy')
+    np.save(f'../weights/{net.psp_loss_model.psp_encoder}_source/{args.dataset}_A_gen_w.npy', np.concatenate(A_codes, axis=0))
 
 def show_w_edit(args):
 
@@ -157,28 +160,22 @@ def find_most_similar_imgs(args):
     print(sim[orders[0:20]])
 
 
-def get_ffhq_codes(args):
-    psp_encoder = pSp(args.psp_path, device, has_decoder=False)
+def get_inversion_img(args, img_path):
+    psp_encoder = pSp(args.psp_path, device, args.size, has_decoder=True)
     psp_encoder.to(device)
     psp_encoder.requires_grad_(False)
-    ffhq_dir = "/home/ybyb/Dataset/ffhq_small"
-    style_codes = []
-    os.makedirs(args.output_dir, exist_ok=True)
-    preprocess = transforms.Compose([transforms.Resize((256, 256)),
+    args.output_dir = '../results/invert'
+
+    resize = (192, 256) if args.dataset == 'car' else (256, 256)
+    preprocess = transforms.Compose([transforms.Resize(resize),
                                     transforms.ToTensor(),
                                     transforms.Normalize([0.5, 0.5, 0.5], [0.5, 0.5, 0.5])])
-    for img_path in tqdm(os.listdir(ffhq_dir)):
-        img = Image.open(os.path.join(ffhq_dir, img_path)).convert("RGB")
-        img = preprocess(img).unsqueeze(0).to(device).float()
 
-        code, _ = psp_encoder(img)
-        # code, invert_img = psp_encoder(img)
-        # save_images(invert_img, args.output_dir, 'invert', 1, 1)
-        style_codes.append(code.detach().cpu().numpy())
-    style_codes = np.concatenate(style_codes, axis=0)
-    
-    with open(os.path.join(args.output_dir, "ffhq_w+.pkl"), 'wb') as f:
-        pickle.dump(style_codes, f)
+    img = Image.open(img_path).convert("RGB")
+    img = preprocess(img).unsqueeze(0).to(device).float()
+    with torch.no_grad():
+        code, invert_img = psp_encoder(img)
+    save_images(invert_img, args.output_dir, 'invert', 1, 1)
 
 
 def get_pair_codes(args, n_samples=500):
@@ -243,13 +240,12 @@ if __name__ == "__main__":
     os.makedirs(sample_dir, exist_ok=True)
 
     # Multi-stage training
-    get_pair_codes(args)
-    show_w_edit(args)
+    # get_pair_codes(args)
+    # show_w_edit(args)
 
     # Prepare sample vectors for each category or generate samples
     # get_clip_samples(args)
-    # get_psp_codes(args)
+    get_psp_codes(args)
 
-    # target_list = ["Van Goph painting", "Miyazaki Hayao painting", "Fernando Botero painting",\
-    #     "3D render in the style of Pixar", "Disney Princess", "White Walker",\
-    #         "Sketch", "Anime", "Watercolor art with thick brushstrokes"]
+    # Get Inversion image
+    # get_inversion_img(args, img_path='/home/ybyb/CODE/StyleGAN-nada/img/Dataset/one-shot-clip/dog_1.png')

@@ -79,10 +79,10 @@ class TrainOptions(object):
         )
 
         self.parser.add_argument(
-            "--num_mask_last",
+            "--num_keep_first",
             type=int,
             default=0,
-            help="Number of masking w+ codes of last layers to keep styles."
+            help="Number of keeping w+ codes of fisrt layers to keep styles."
         )
 
         self.parser.add_argument(

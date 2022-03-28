@@ -64,14 +64,14 @@ def train(args):
         betas=(0 ** g_reg_ratio, 0.99 ** g_reg_ratio),
     )
 
-    args.svm_boundary = torch.randn(1, (18-args.num_mask_last)*512+1, device=device)
+    args.svm_boundary = torch.randn(1, args.num_keep_first*512+1, device=device)
     args.svm_boundary = args.svm_boundary / args.svm_boundary.norm()
     args.svm_boundary.requires_grad=True
 
     # Set up output directories.
     prefix = f"{args.psp_loss_type}_{args.delta_w_type}"
     if args.psp_model_weight > 0:
-        sample_dir = os.path.join(args.output_dir, f"{prefix}_{args.num_mask_last}-alpha_{args.psp_alpha}-clip+psp-sample")
+        sample_dir = os.path.join(args.output_dir, f"{prefix}_{args.num_keep_first}-alpha_{args.psp_alpha}-clip+psp-sample")
     else:
         sample_dir = os.path.join(args.output_dir, "clip-sample")
 
@@ -188,7 +188,7 @@ def train(args):
         if args.psp_loss_type == "dynamic":
             delta_w = delta_w / delta_w.norm()
             tmp = torch.zeros(18, 512, device=delta_w.device)
-            tmp[0:(18-args.num_mask_last)] = delta_w.view(-1, 512)
+            tmp[0:args.num_keep_first] = delta_w.view(-1, 512)
             np.save(os.path.join(sample_dir, "dynamic_w.npy"), tmp.cpu().numpy())
 
         import matplotlib.pyplot as plt

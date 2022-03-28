@@ -2,9 +2,10 @@
 target_class="026_970_491_4k_jefrey-yonathan-selermun-by-jefreyang_00.png"
 output_dir="ViT-B-16+32"
 psp_alpha=0.5
-num_mask_last=10
+num_keep_first=7
 cuda_id=1
 delta_w_type='mean'
+source_type='mean'
 
 CUDA_VISIBLE_DEVICES=$cuda_id python train.py  \
                 --batch 2  --dataset "ffhq" \
@@ -15,6 +16,7 @@ CUDA_VISIBLE_DEVICES=$cuda_id python train.py  \
                 --iter 301 \
                 --source_class "photo" \
                 --target_class  "$target_class" \
+                --source_type $source_type \
                 --alpha 0 \
                 --auto_layer_k 18 \
                 --auto_layer_iters 0 --auto_layer_batch 8 \
@@ -46,7 +48,7 @@ CUDA_VISIBLE_DEVICES=$cuda_id python visual.py --size 1024 \
                 --clip_models "ViT-B/32" \
                 --clip_model_weights 0.0 \
                 --psp_model_weight 1.0 \
-                --num_mask_last $num_mask_last \
+                --num_keep_first $num_keep_first \
                 --delta_w_type $delta_w_type \
 
 CUDA_VISIBLE_DEVICES=$cuda_id python train.py  \
@@ -58,6 +60,7 @@ CUDA_VISIBLE_DEVICES=$cuda_id python train.py  \
                 --iter 401 \
                 --source_class "photo" \
                 --target_class "$target_class" \
+                --source_type $source_type \
                 --alpha 0 \
                 --auto_layer_k 18 \
                 --auto_layer_iters 0 --auto_layer_batch 8 \
@@ -67,7 +70,7 @@ CUDA_VISIBLE_DEVICES=$cuda_id python train.py  \
                 --clip_models "ViT-B/32" "ViT-B/16"\
                 --clip_model_weights 1.0 1.0 \
                 --psp_model_weight 1 \
-                --num_mask_last $num_mask_last \
+                --num_keep_first $num_keep_first \
                 --psp_alpha $psp_alpha \
                 --lambda_direction 1.0 \
                 --lambda_global 0.0 \

@@ -35,6 +35,7 @@ class pSp(nn.Module):
 			self.decoder = Generator(output_size, 512, 8)
 		# Load weights if needed
 		self.load_weights()
+		self.psp_encoder = 'e4e' if self.opts.encoder_type == 'Encoder4Editing' else 'psp'
 
 	def set_encoder(self):
 		if self.opts.encoder_type == 'GradualStyleEncoder':
@@ -43,6 +44,8 @@ class pSp(nn.Module):
 			encoder = psp_encoders.BackboneEncoderUsingLastLayerIntoW(50, 'ir_se', self.opts)
 		elif self.opts.encoder_type == 'BackboneEncoderUsingLastLayerIntoWPlus':
 			encoder = psp_encoders.BackboneEncoderUsingLastLayerIntoWPlus(50, 'ir_se', self.opts)
+		elif self.opts.encoder_type == 'Encoder4Editing':
+			encoder = psp_encoders.Encoder4Editing(50, 'ir_se', self.opts)
 		else:
 			raise Exception('{} is not a valid encoders'.format(self.opts.encoder_type))
 		return encoder
