@@ -72,6 +72,8 @@ def get_clip_samples(args, n_samples=10000, debug=False):
         for i in tqdm(range(n_samples)):
             sample_z = mixing_noise(1, 512, args.mixing, device)
             [sampled_src, _], _ = net(sample_z, truncation=truncation)
+            if args.dataset == 'car':
+                sampled_src = sampled_src[:, :, 64:448, :].contiguous()
             for k in net.clip_loss_models.keys():
                 img_feats = net.clip_loss_models[k].get_image_features(sampled_src)
                 img_feats = img_feats.squeeze().detach().cpu().numpy()
@@ -110,9 +112,9 @@ def get_psp_codes(args, n_samples=10000, debug=False):
             if debug:
                 save_images(sampled_src, args.output_dir, 'src', 2, i)
                 save_images(invert_img, args.output_dir, 'invert', 2, i)
-    os.makedirs(f'../weights/{net.psp_loss_model.psp_encoder}_source/', exist_ok=True)
-    print(f'Save w+ codes to ../weights/{net.psp_loss_model.psp_encoder}_source/{args.dataset}_A_gen_w.npy')
-    np.save(f'../weights/{net.psp_loss_model.psp_encoder}_source/{args.dataset}_A_gen_w.npy', np.concatenate(A_codes, axis=0))
+    os.makedirs(f'../weights/{net.psp_loss_model.model.psp_encoder}_source/', exist_ok=True)
+    print(f'Save w+ codes to ../weights/{net.psp_loss_model.model.psp_encoder}_source/{args.dataset}_A_gen_w.npy')
+    np.save(f'../weights/{net.psp_loss_model.model.psp_encoder}_source/{args.dataset}_A_gen_w.npy', np.concatenate(A_codes, axis=0))
 
 def show_w_edit(args):
 
