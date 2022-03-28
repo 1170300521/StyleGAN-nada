@@ -24,7 +24,7 @@ class PSPLoss(torch.nn.Module):
         self.args = args
         self.n_latent = int(math.log(args.size, 2)) * 2 - 2
 
-        self.model = pSp(self.args.psp_path, device, output_size=args.size, has_decoder=True)
+        self.model = pSp(self.args.psp_path, device, output_size=args.size, has_decoder=False)
         self.model.to(device)
 
         # Moving Average Coefficient

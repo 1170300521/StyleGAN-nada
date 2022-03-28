@@ -64,10 +64,14 @@ def get_clip_samples(args, n_samples=10000, debug=False):
 
     net.eval()
     samples_vec = {k: [] for k in net.clip_loss_models.keys()}
+    if args.dataset == 'car':
+        truncation = 0.5
+    else:
+        truncation = 1
     with torch.no_grad():
         for i in tqdm(range(n_samples)):
             sample_z = mixing_noise(1, 512, args.mixing, device)
-            [sampled_src, _], _ = net(sample_z, truncation=args.sample_truncation)
+            [sampled_src, _], _ = net(sample_z, truncation=truncation)
             for k in net.clip_loss_models.keys():
                 img_feats = net.clip_loss_models[k].get_image_features(sampled_src)
                 img_feats = img_feats.squeeze().detach().cpu().numpy()
@@ -79,7 +83,7 @@ def get_clip_samples(args, n_samples=10000, debug=False):
         with open(os.path.join(sample_dir, f'{args.dataset}_{k[-2::]}_samples.pkl'), 'wb') as f:
             pickle.dump(samples_vec[k], f)
 
-def get_psp_codes(args, n_samples=10000, debug=True):
+def get_psp_codes(args, n_samples=10000, debug=False):
     '''
     Sample images from GAN and embed them into w+ space
     '''
@@ -88,13 +92,17 @@ def get_psp_codes(args, n_samples=10000, debug=True):
     A_codes = []
 
     net.eval()
+    if args.dataset == 'car':
+        truncation = 0.5
+    else:
+        truncation = 1
     with torch.no_grad():
         for i in tqdm(range(n_samples // 2)):
             sample_z = mixing_noise(2, 512, args.mixing, device)
-            [sampled_src, _], _ = net(sample_z)
-            img = net.psp_loss_model.psp_preprocess(sampled_src)
+            [sampled_src, _], _ = net(sample_z, truncation=truncation)
             if args.dataset == 'car':
-                img = img[:, :, 64:448, :]
+                sampled_src = sampled_src[:, :, 64:448, :].contiguous()
+            img = net.psp_loss_model.psp_preprocess(sampled_src)
             codes, invert_img = net.psp_loss_model.get_image_features(img, norm=False)
             codes = codes.detach().cpu().numpy()
             A_codes.append(codes)
