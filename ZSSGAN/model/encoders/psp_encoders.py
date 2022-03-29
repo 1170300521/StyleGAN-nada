@@ -6,8 +6,8 @@ import torch.nn.functional as F
 from torch import nn
 from torch.nn import Linear, Conv2d, BatchNorm2d, PReLU, Sequential, Module
 
-from ZSSGAN.model.encoders.helpers import get_blocks, Flatten, bottleneck_IR, bottleneck_IR_SE, _upsample_add
-from ZSSGAN.model.sg2_model import EqualLinear
+from model.encoders.helpers import get_blocks, Flatten, bottleneck_IR, bottleneck_IR_SE, _upsample_add
+from model.sg2_model import EqualLinear
 
 
 class ProgressiveStage(Enum):

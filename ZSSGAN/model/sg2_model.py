@@ -522,6 +522,44 @@ class Generator(nn.Module):
 
         return s_codes    
 
+    def g_synthesis(self, latent, randomize_noise=True, noise=None, num_feat=18):
+        if noise is None:
+            if randomize_noise:
+                noise = [None] * self.num_layers
+            else:
+                noise = [
+                    getattr(self.noises, f"noise_{i}") for i in range(self.num_layers)
+                ]
+
+        styles_feature = []
+
+        out = self.input(latent)
+        styles_feature.append(out)
+
+        out = self.conv1(out, latent[:, 0], noise=noise[0])
+        styles_feature.append(out)
+
+        skip = self.to_rgb1(out, latent[:, 1])
+
+        i = 1
+        for conv1, conv2, noise1, noise2, to_rgb in zip(
+            self.convs[::2], self.convs[1::2], noise[1::2], noise[2::2], self.to_rgbs
+        ):
+            out = conv1(out, latent[:, i], noise=noise1)
+            if len(styles_feature) < num_feat:
+                styles_feature.append(out)
+
+            out =  conv2(out, latent[:, i + 1], noise=noise2)
+            if len(styles_feature) < num_feat:
+                styles_feature.append(out)
+
+            skip = to_rgb(out, latent[:, i + 2], skip)
+
+            i += 2
+
+        image = skip
+        return image, styles_feature
+
     def forward(
         self,
         styles,

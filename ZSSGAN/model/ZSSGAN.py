@@ -11,10 +11,10 @@ sys.path.insert(0, os.path.abspath('../'))
 import torch
 
 
-from ZSSGAN.model.sg2_model import Generator, Discriminator
-from ZSSGAN.criteria.clip_loss import CLIPLoss 
-from ZSSGAN.criteria.psp_loss import PSPLoss
-from ZSSGAN.criteria.regularize_loss import RegularizeLoss      
+from model.sg2_model import Generator, Discriminator
+from criteria.clip_loss import CLIPLoss 
+from criteria.psp_loss import PSPLoss
+from criteria.regularize_loss import RegularizeLoss      
 
 def requires_grad(model, flag=True):
     for p in model.parameters():

@@ -9,8 +9,8 @@ import math
 
 import torch
 from torch import nn
-from ZSSGAN.model.encoders import psp_encoders
-from ZSSGAN.model.sg2_model import Generator
+from model.encoders import psp_encoders
+from model.sg2_model import Generator
 
 
 def get_keys(d, name):
