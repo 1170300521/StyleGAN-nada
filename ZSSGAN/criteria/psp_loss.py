@@ -71,7 +71,7 @@ class PSPLoss(torch.nn.Module):
             delta_w = np.ones((self.n_latent, 512))
         unmasked_num = self.n_latent
         if self.args.num_keep_first > 0:
-            unmasked_num = self.args.args.num_keep_first
+            unmasked_num = self.args.num_keep_first
             unmasked_num = max(unmasked_num, 1)
             delta_w = delta_w[0: unmasked_num]
         

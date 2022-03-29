@@ -138,7 +138,8 @@ def train(args):
 
         if i % args.output_interval == 0:
             net.eval()
-
+            if args.crop_for_cars:
+                args.sample_truncation = 0.5
             with torch.no_grad():
                 [sampled_src, sampled_dst], loss = net([fixed_z], truncation=args.sample_truncation)
 
