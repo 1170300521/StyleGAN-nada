@@ -48,10 +48,14 @@ class CLIPLoss(torch.nn.Module):
         # self.model.requires_grad_(False)
         self.clip_preprocess = clip_preprocess
         
-        self.preprocess = transforms.Compose([transforms.Normalize(mean=[-1.0, -1.0, -1.0], std=[2.0, 2.0, 2.0])] + # Un-normalize from [-1.0, 1.0] (GAN output) to [0, 1].
-                                              clip_preprocess.transforms[:2] +                                      # to match CLIP input scale assumptions
-                                              clip_preprocess.transforms[4:])                                       # + skip convert PIL to tensor
-
+        # self.preprocess = transforms.Compose([transforms.Normalize(mean=[-1.0, -1.0, -1.0], std=[2.0, 2.0, 2.0])] + # Un-normalize from [-1.0, 1.0] (GAN output) to [0, 1].
+        #                                       clip_preprocess.transforms[:2] +                                      # to match CLIP input scale assumptions
+        #                                       clip_preprocess.transforms[4:])                                       # + skip convert PIL to tensor
+        self.preprocess = transforms.Compose([
+            transforms.Normalize(mean=[-1.0, -1.0, -1.0], std=[2.0, 2.0, 2.0]),
+            transforms.Resize((224, 224), interpolation=transforms.InterpolationMode.BICUBIC),
+            transforms.Normalize((0.48145466, 0.4578275, 0.40821073), (0.26862954, 0.26130258, 0.27577711)),
+        ])
         self.target_direction      = None
         self.target_image          = None
         self.target_text           = None

@@ -7,7 +7,7 @@ CUDA_VISIBLE_DEVICES=0 python train.py  \
                 --psp_path ../weights/psp_ffhq_encode.pt \
                 --iter 501 \
                 --source_class "photo" \
-                --target_class "wp3890360.jpeg" \
+                --target_class "wp2267340.jpeg" \
                 --source_type "mean" \
                 --auto_layer_k 18 \
                 --auto_layer_iters 0 --auto_layer_batch 8 \
@@ -20,4 +20,4 @@ CUDA_VISIBLE_DEVICES=0 python train.py  \
                 --lambda_direction 1.0 \
                 --lambda_global 0.0 \
                 --lambda_texture 0.0 \
-                --style_img_dir ../img/Dataset/Car/wp3890360.jpeg \
+                --style_img_dir ../img/Dataset/Car/wp2267340.jpeg \
