@@ -137,6 +137,6 @@ def get_mask(img_path):
     imageio.imsave(os.path.join(args.output_dir, f'{prefix}_orig.jpg'), orig_img)
     # imageio.imsave(os.path.join(args.output_dir, f'{prefix}_invert.jpg'), invert_img)
 if __name__ == "__main__":
-    img_path = "../img/mind/10.png"
+    img_path = "../img/mind/7.png"
     # get_transfer_image(img_path)
     get_mask(img_path)

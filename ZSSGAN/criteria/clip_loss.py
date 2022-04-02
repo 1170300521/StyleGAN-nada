@@ -11,6 +11,7 @@ import tqdm
 import clip
 from PIL import Image
 from sklearn.decomposition import PCA
+import matplotlib.pyplot as plt
 
 from ZSSGAN.utils.text_templates import imagenet_templates, part_templates, imagenet_templates_small
 
@@ -44,6 +45,7 @@ class CLIPLoss(torch.nn.Module):
         self.args = args
         self.model_name = clip_model
         self.model, clip_preprocess = clip.load(clip_model, device=self.device)
+        self.visual_model = self.model.visual
 
         # self.model.requires_grad_(False)
         self.clip_preprocess = clip_preprocess
@@ -71,6 +73,7 @@ class CLIPLoss(torch.nn.Module):
         self.lambda_direction = lambda_direction
         self.lambda_manifold  = lambda_manifold
         self.lambda_texture   = lambda_texture
+        self.lambda_partial   = self.args.lambda_partial
         self.alpha = args.alpha
 
         self.src_text_features = None
@@ -86,6 +89,70 @@ class CLIPLoss(torch.nn.Module):
         self.texture_loss = torch.nn.MSELoss()
         self.condition = None
         self.clip_mean = self.get_clip_mean()
+
+        self.target_keys = []
+        self.target_tokens = []
+        if self.lambda_partial > 0:
+            self.hook_handlers = []
+            self.feat_keys = []
+            self.feat_tokens = []
+            self.gen_attn_weights = []
+            self._register_hooks(layer_ids=[3], facet='key')
+
+    
+    def _get_hook(self, facet):
+        if facet in ['token']:
+            def _hook(model, input, output):
+                input = model.ln_1(input[0])
+                attnmap = model.attn(input, input, input, need_weights=True, attn_mask=model.attn_mask)[1]
+                self.feat_tokens.append(output[1:].permute(1, 0, 2))
+                self.gen_attn_weights.append(attnmap)
+            return _hook
+        elif facet == 'feat':
+            def _outer_hook(model, input, output):
+                output = output[1:].permute(1, 0, 2)  # LxBxD -> BxLxD
+                # TODO: Remember to add VisualTransformer ln_post, i.e. LayerNorm
+                output = F.layer_norm(output, self.visual_model.ln_post.normalized_shape, \
+                    self.visual_model.ln_post.weight.type(output.dtype), \
+                    self.visual_model.ln_post.bias.type(output.dtype), \
+                        self.visual_model.ln_post.eps)
+                output = output @ self.visual_model.proj
+                self.feat_tokens.append(output)
+            return _outer_hook
+
+        if facet == 'query':
+            facet_idx = 0
+        elif facet == 'key':
+            facet_idx = 1
+        elif facet == 'value':
+            facet_idx = 2
+        else:
+            raise TypeError(f"{facet} is not a supported facet.")
+
+        def _inner_hook(module, input, output):
+            input = input[0]
+            N, B, C = input.shape
+            weight = module.in_proj_weight.detach()
+            bias = module.in_proj_bias.detach()
+            qkv = F.linear(input, weight, bias)[1:]  # remove cls key
+            qkv = qkv.reshape(-1, B, 3, C).permute(2, 1, 0, 3)  # BxNxC
+            self.feat_keys.append(qkv[facet_idx])
+        return _inner_hook
+    
+    def _register_hooks(self, layer_ids=[11], facet='key'):
+        for block_idx, block in enumerate(self.visual_model.transformer.resblocks):
+            if block_idx in layer_ids:
+                self.hook_handlers.append(block.register_forward_hook(self._get_hook('token')))
+                assert facet in ['key', 'query', 'value']
+                self.hook_handlers.append(block.attn.register_forward_hook(self._get_hook(facet)))
+    
+    def _unregister_hooks(self) -> None:
+        """
+        unregisters the hooks. should be called after feature extraction.
+        """
+        for handle in self.hook_handlers:
+            handle.remove()
+        self.hook_handlers = []
 
     def get_clip_mean(self):
         orig_sample_path = os.path.join('../weights/clip_mean/', f"{self.args.dataset}_{self.model_name[-2::]}_samples.pkl")
@@ -110,7 +177,7 @@ class CLIPLoss(torch.nn.Module):
     def encode_images(self, images: torch.Tensor) -> torch.Tensor:
         images = self.preprocess(images).to(self.device)
         return self.model.encode_image(images)
-
+        
     def encode_images_with_cnn(self, images: torch.Tensor) -> torch.Tensor:
         images = self.preprocess_cnn(images).to(self.device)
         return self.model_cnn.encode_image(images)
@@ -137,6 +204,11 @@ class CLIPLoss(torch.nn.Module):
         return text_features
 
     def get_image_features(self, img: torch.Tensor, norm: bool = True) -> torch.Tensor:
+        if self.lambda_partial > 0:
+            self.feat_keys = []
+            self.feat_tokens = []
+            self.gen_attn_weights = []
+
         image_features = self.encode_images(img)
         
         if norm:
@@ -305,6 +377,8 @@ class CLIPLoss(torch.nn.Module):
         return encoding
 
     def compute_img2img_direction(self, source_images: torch.Tensor, target_images: list) -> torch.Tensor:
+        key_list = []
+        token_list = []
         with torch.no_grad():
             target_encodings = []
             for target_img in target_images:
@@ -314,23 +388,36 @@ class CLIPLoss(torch.nn.Module):
                 encoding /= encoding.norm(dim=-1, keepdim=True)
 
                 target_encodings.append(encoding)
+                if self.lambda_partial > 0:
+                    key_list.append(self.feat_keys[0])
+                    token_list.append(self.feat_tokens[0])
             
             target_encoding = torch.cat(target_encodings, axis=0)
             target_encoding = target_encoding.mean(dim=0, keepdim=True)
             target_encoding /= target_encoding.norm(dim=-1, keepdim=True)
 
+            if self.lambda_partial > 0:
+                self.target_keys = torch.cat(key_list, dim=0).mean(dim=0, keepdim=True)
+                # self.target_keys = target_key / target_key.norm(dim=-1, keepdim=True)
+                # self.target_keys = self.target_keys.repeat(self.args.batch, 1, 1)
+                self.target_tokens = torch.cat(token_list, dim=0).mean(dim=0, keepdim=True)
+                # self.target_tokens = target_token / target_token.norm(dim=-1, keepdim=True)
+                # remove_back = self.gen_attn_weights[0][:, 0, 1:].unsqueeze(-1)
+                # self.target_tokens = self.target_tokens * remove_back
+                # self.target_tokens = self.target_tokens.repeat(self.args.batch, 1, 1)
+
             self.target_image = target_encoding
 
             src_encoding = self.clip_mean
 
-            if self.args.source_type == 'project':
-                src_encoding /= src_encoding.norm(dim=-1, keepdim=True)
-                sim = (target_encoding * src_encoding).sum()
-                direction = target_encoding - sim * src_encoding
-                direction /= direction.norm(dim=-1, keepdim=True)
-            else:
-                direction = target_encoding - src_encoding
-                direction /= direction.norm(dim=-1, keepdim=True)
+            # if self.args.source_type == 'project':
+            #     src_encoding /= src_encoding.norm(dim=-1, keepdim=True)
+            #     sim = (target_encoding * src_encoding).sum()
+            #     direction = target_encoding - sim * src_encoding
+            #     direction /= direction.norm(dim=-1, keepdim=True)
+            # else:
+            direction = target_encoding - src_encoding
+            direction /= direction.norm(dim=-1, keepdim=True)
 
         return direction
 
@@ -399,9 +486,82 @@ class CLIPLoss(torch.nn.Module):
         text_direction /= text_direction.norm(dim=-1, keepdim=True)
         return text_direction
 
+    def remd_loss(self, tgt_tokens, style_tokens):
+        '''
+        REMD Loss referring to style transfer
+        '''
+        tgt_tokens /= tgt_tokens.clone().norm(dim=-1, keepdim=True)
+        style_tokens /= style_tokens.clone().norm(dim=-1, keepdim=True)
+
+        attn_weights = torch.bmm(tgt_tokens, style_tokens.permute(0, 2, 1))
+
+        cost_matrix = 1 - attn_weights
+        B, N, M = cost_matrix.shape
+        row_values, row_indices = cost_matrix.min(dim=2)
+        col_values, col_indices = cost_matrix.min(dim=1)
+
+        row_sum = row_values.mean(dim=1)
+        col_sum = col_values.mean(dim=1)
+
+        overall = torch.stack([row_sum, col_sum], dim=1)
+        return overall.max(dim=1)[0].mean()
+    
+    def content_loss(self, src_tokens, tgt_tokens):
+        B, N, D = tgt_tokens.shape
+        src_tokens /= src_tokens.clone().norm(dim=-1, keepdim=True)
+        tgt_tokens /= tgt_tokens.clone().norm(dim=-1, keepdim=True)
+
+        tgt_mat = 1 - torch.bmm(tgt_tokens, tgt_tokens.permute(0, 2, 1))
+        src_mat = 1 - torch.bmm(src_tokens, src_tokens.permute(0, 2, 1))
+
+        tgt_mat /= tgt_mat.clone().sum(dim=1, keepdim=True)
+        src_mat /= src_mat.clone().sum(dim=1, keepdim=True)
+        loss = F.l1_loss(tgt_mat, src_mat)
+        return loss
+
+    def moment_matching_loss(self, img_tokens, target_tokens):
+        B, N, D = img_tokens.shape
+        img_mean = img_tokens.mean(dim=1)
+        target_mean = target_tokens.mean(dim=1)
+
+        img_cov = img_tokens-img_mean
+
+    def clip_partial_loss(self, src_tokens, tgt_tokens):
+        B, N, _ = tgt_tokens.shape
+
+        style_tokens = self.target_tokens.repeat(B, 1, 1)
+
+        # TODO: Option 1: Style transfer loss
+        return self.remd_loss(tgt_tokens, style_tokens) + 100 * self.content_loss(src_tokens, tgt_tokens)
+
+        # TODO: Option 2: Flatten dim of H*W to obtain a large vector and compute cosine loss
+        # target_tokens = target_tokens.reshape(B, -1)
+        # img_tokens = img_tokens.view(B, -1)
+
+        # target_tokens /= target_tokens.clone().norm(dim=-1, keepdim=True)
+        # img_tokens  /= img_tokens.clone().norm(dim=-1, keepdim=True)
+
+        # # attn_weights = torch.bmm(img_tokens.unsqueeze(-1), target_tokens.unsqueeze(1))
+        # # attn_weights = torch.softmax(attn_weights, dim=-1)
+        # # target_tokens = torch.bmm(attn_weights, target_tokens.unsqueeze(-1)).squeeze(-1)
+        # # target_tokens /= target_tokens.clone().norm(dim=-1, keepdim=True)
+
+        # return self.direction_loss(img_tokens, target_tokens).mean()
+
     def clip_directional_loss(self, src_img: torch.Tensor, source_class: str, target_img: torch.Tensor, target_class: str) -> torch.Tensor:
         src_encoding    = self.get_image_features(src_img)
+
+        if self.lambda_partial > 0 and len(self.target_keys) > 0:
+            src_tokens = self.feat_tokens[0]
+            src_tokens /= src_tokens.clone().norm(dim=-1, keepdim=True)
+
         target_encoding = self.get_image_features(target_img)
+
+        if self.lambda_partial > 0 and len(self.target_keys) > 0:
+            # img_keys = self.feat_keys[0]  # BxNxD
+            # img_keys /= img_keys.clone().norm(dim=-1, keepdim=True)
+            tgt_tokens = self.feat_tokens[0]
+            tgt_tokens /= tgt_tokens.clone().norm(dim=-1, keepdim=True)
 
         if self.target_direction is None:
             self.target_direction = self.compute_text_direction(source_class, target_class)
@@ -409,7 +569,11 @@ class CLIPLoss(torch.nn.Module):
         edit_direction = (target_encoding - src_encoding)
         edit_direction /= edit_direction.clone().norm(dim=-1, keepdim=True)
         
-        return self.direction_loss(edit_direction, self.target_direction).mean()
+        loss = self.direction_loss(edit_direction, self.target_direction).mean()
+        # loss = 0
+        if self.lambda_partial > 0 and len(self.target_keys) > 0:
+            loss += self.lambda_partial * self.clip_partial_loss(src_tokens, tgt_tokens)
+        return loss
 
     def global_clip_loss(self, img: torch.Tensor, text) -> torch.Tensor:
         if self.target_image is not None:

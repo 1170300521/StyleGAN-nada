@@ -135,6 +135,13 @@ class TrainOptions(object):
             default=0.0,
             help="Strength of manifold constraint term"
         )
+
+        self.parser.add_argument(
+            "--lambda_partial",
+            type=float,
+            default=0.0,
+            help="Strength of partial clip loss, turning on this will add hook on ViT."
+        )
         ################################
         # End of Non-direction losses. #
         ################################
