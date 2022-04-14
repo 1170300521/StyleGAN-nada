@@ -14,6 +14,7 @@ import torch
 from model.sg2_model import Generator, Discriminator
 from criteria.clip_loss import CLIPLoss 
 from criteria.psp_loss import PSPLoss
+from criteria.vgg_loss import VGGLoss
 from criteria.regularize_loss import RegularizeLoss      
 
 def requires_grad(model, flag=True):
@@ -192,6 +193,9 @@ class ZSSGAN(torch.nn.Module):
         self.has_psp_loss = args.psp_model_weight > 0
         if self.has_psp_loss:
             self.psp_loss_model = PSPLoss(self.device, args=args)
+        
+        # Style loss based on VGG16
+        # self.vgg_loss_model = VGGLoss(self.device, args=args)
         self.mse_loss  = torch.nn.MSELoss()
 
         self.regularize_loss = RegularizeLoss(self.device,
@@ -208,6 +212,8 @@ class ZSSGAN(torch.nn.Module):
 
         if args.target_img_list is not None and self.has_clip_loss:
             self.set_img2img_direction()
+            # self.vgg_loss_model.compute_target_features(args.target_img_list)
+
     
     def get_samples_clip_mean(self, num=1000, debug=False):
         '''
@@ -331,6 +337,7 @@ class ZSSGAN(torch.nn.Module):
             psp_loss, psp_codes = self.psp_loss_model(trainable_img, frozen_img, iters=iters, return_codes=True)
             loss += self.args.psp_model_weight * psp_loss
         
+        # loss += self.vgg_loss_model(trainable_img)
         if return_psp_codes:
             return [frozen_img, trainable_img], loss, psp_codes
         else:
