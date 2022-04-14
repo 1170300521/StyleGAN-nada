@@ -10,8 +10,8 @@ CUDA_VISIBLE_DEVICES=$cuda_id python inference.py \
                 --batch 2 \
                 --n_sample 4 --output_dir $output_dir \
                 --lr 0.002 \
-                --frozen_gen_ckpt ../weights/stylegan2-ffhq-config-f.pt \
-                --psp_path ../weights/psp_weights/psp_ffhq_encode.pt \
+                --frozen_gen_ckpt /home/ybyb/CODE/StyleGAN-nada/results/demo_ffhq/Old+Fernando_Botero_Painting/ViT-B-16+32-source/checkpoint/000300.pt \
+                --psp_path ../weights/psp_weights/e4e_ffhq_encode.pt \
                 # --iter 301 \
                 # --source_class "photo" \
                 # --target_class "$target_class" \

@@ -70,10 +70,11 @@ def train(args):
 
     # Set up output directories.
     prefix = f"{args.psp_loss_type}_{args.delta_w_type}"
+    base_dir = f"partial_{args.lambda_partial}-content_{args.lambda_content}-clip-sample"
     if args.psp_model_weight > 0:
-        sample_dir = os.path.join(args.output_dir, f"{prefix}_{args.num_keep_first}-alpha_{args.psp_alpha}-clip+psp-sample")
+        sample_dir = os.path.join(args.output_dir, f"{prefix}_{args.num_keep_first}-alpha_{args.psp_alpha}-{base_dir}")
     else:
-        sample_dir = os.path.join(args.output_dir, "clip-sample")
+        sample_dir = os.path.join(args.output_dir, base_dir)
 
     ckpt_dir   = os.path.join(args.output_dir, "checkpoint")
 

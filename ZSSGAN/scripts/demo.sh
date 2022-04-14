@@ -1,13 +1,13 @@
 # ffhq stylegan2-ffhq-config-f : 1024; cat: 512; dog: 512; church: 256; horse: 256; car: 512, crop_for_cars 
 CUDA_VISIBLE_DEVICES=1 python train.py  \
                 --batch 2  --dataset "ffhq" \
-                --n_sample 4 --output_dir "partial-ViT-B-16+32-mean" \
+                --n_sample 4 --output_dir "e4e-corresponding_src" \
                 --lr 0.002 \
                 --frozen_gen_ckpt ../weights/stylegan2-ffhq-config-f.pt \
                 --psp_path ../weights/psp_ffhq_encode.pt \
                 --iter 501 \
                 --source_class "photo" \
-                --target_class "dufu.png" \
+                --target_class "Image_12" \
                 --source_type "mean" \
                 --auto_layer_k 18 \
                 --auto_layer_iters 0 --auto_layer_batch 8 \
@@ -19,5 +19,5 @@ CUDA_VISIBLE_DEVICES=1 python train.py  \
                 --psp_model_weight 0.0 \
                 --lambda_direction 1.0 \
                 --lambda_global 0.0 \
-                --lambda_partial 1.0 \
-                --style_img_dir ../img/Dataset/FFHQ/dufu.png \
+                --lambda_partial 0.0 \
+                --style_img_dir ../img/mind/12.png \

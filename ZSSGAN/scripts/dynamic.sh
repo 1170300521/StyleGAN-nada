@@ -2,21 +2,23 @@
 num_keep_first=7
 cuda_id=1
 psp_loss_type="dynamic"
-lambda_constrain=0
 sliding_window_size=30
 delta_w_type='mean'
 
 # Training config
 psp_alpha=0.4
+psp_model_weight=5
+lambda_partial=1
+lambda_content=0
 source_type='mean'
-target_class="wp3890360.jpeg"
-style_img_dir=../img/Dataset/Car/wp3890360.jpeg
-output_dir="e4e-ViT-B-16+32-mean"
+target_class="Image_1"
+style_img_dir=../img/mind/1.png
+output_dir="e4e-mini_batch_mean"
 
 # Dataset info
-dataset='car'
-frozen_gen_ckpt=../weights/stylegan2-car-config-f.pt
-psp_path=../weights/psp_weights/e4e_cars_encode.pt
+dataset='ffhq'
+frozen_gen_ckpt=../weights/stylegan2-ffhq-config-f.pt
+psp_path=../weights/psp_weights/e4e_ffhq_encode.pt
 
 
 CUDA_VISIBLE_DEVICES=$cuda_id python train.py  \
@@ -25,7 +27,7 @@ CUDA_VISIBLE_DEVICES=$cuda_id python train.py  \
                 --lr 0.002 \
                 --frozen_gen_ckpt $frozen_gen_ckpt \
                 --psp_path $psp_path \
-                --iter 501 \
+                --iter 301 \
                 --source_class "photo" \
                 --target_class "$target_class" \
                 --source_type $source_type \
@@ -38,11 +40,12 @@ CUDA_VISIBLE_DEVICES=$cuda_id python train.py  \
                 --clip_models "ViT-B/32" "ViT-B/16" \
                 --psp_loss_type $psp_loss_type \
                 --clip_model_weights 1.0 1.0 \
-                --psp_model_weight 2 \
+                --psp_model_weight $psp_model_weight \
                 --num_keep_first $num_keep_first \
                 --psp_alpha $psp_alpha \
                 --lambda_direction 1.0 \
-                --lambda_constrain $lambda_constrain \
+                --lambda_partial $lambda_partial \
+                --lambda_content $lambda_content \
                 --lambda_global 0.0 \
                 --lambda_texture 0.0 \
                 --sliding_window_size $sliding_window_size \

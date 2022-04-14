@@ -408,14 +408,19 @@ class CLIPLoss(torch.nn.Module):
 
             self.target_image = target_encoding
 
+            # Option 1: Global mean
             src_encoding = self.clip_mean
 
-            # if self.args.source_type == 'project':
-            #     src_encoding /= src_encoding.norm(dim=-1, keepdim=True)
-            #     sim = (target_encoding * src_encoding).sum()
-            #     direction = target_encoding - sim * src_encoding
-            #     direction /= direction.norm(dim=-1, keepdim=True)
-            # else:
+            # Option 2: mini-batch mean
+            # src_encoding = self.get_image_features(source_images)
+            # src_encoding = src_encoding.mean(dim=0, keepdim=True)
+            
+            # Given src image
+            # src_path = "../results/tmp/12_invert_000001.jpg"
+            # src_preprocessed = self.clip_preprocess(Image.open(src_path)).unsqueeze(0).to(self.device)    
+            # src_encoding = self.model.encode_image(src_preprocessed)
+            # src_encoding /= src_encoding.norm(dim=-1, keepdim=True)
+
             direction = target_encoding - src_encoding
             direction /= direction.norm(dim=-1, keepdim=True)
 
@@ -532,7 +537,7 @@ class CLIPLoss(torch.nn.Module):
         style_tokens = self.target_tokens.repeat(B, 1, 1)
 
         # TODO: Option 1: Style transfer loss
-        return self.remd_loss(tgt_tokens, style_tokens) + 100 * self.content_loss(src_tokens, tgt_tokens)
+        return self.remd_loss(tgt_tokens, style_tokens) + self.args.lambda_content * self.content_loss(src_tokens, tgt_tokens)
 
         # TODO: Option 2: Flatten dim of H*W to obtain a large vector and compute cosine loss
         # target_tokens = target_tokens.reshape(B, -1)

@@ -1,4 +1,6 @@
 from argparse import ArgumentParser
+
+from numpy import float16
 from utils.file_utils import get_dir_img_list
 
 class TrainOptions(object):
@@ -141,6 +143,13 @@ class TrainOptions(object):
             type=float,
             default=0.0,
             help="Strength of partial clip loss, turning on this will add hook on ViT."
+        )
+
+        self.parser.add_argument(
+            "--lambda_content",
+            type=float,
+            default=0.0,
+            help="Strength of keeping content, paired with style loss."
         )
         ################################
         # End of Non-direction losses. #
