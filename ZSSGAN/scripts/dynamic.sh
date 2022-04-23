@@ -1,24 +1,24 @@
 # ffhq: 1024; cat: 512; dog: 512; church: 256; horse: 256; car: 512, crop_for_cars 
 num_keep_first=7
-cuda_id=1
+cuda_id=0
 psp_loss_type="dynamic"
 sliding_window_size=30
 delta_w_type='mean'
 
 # Training config
-psp_alpha=0.4
-psp_model_weight=5
-lambda_partial=1
+psp_alpha=0.3
+psp_model_weight=1
+lambda_partial=2
 lambda_content=0
 source_type='mean'
-target_class="Image_1"
-style_img_dir=../img/mind/1.png
-output_dir="e4e-mini_batch_mean"
+target_class="tiger.png"
+style_img_dir=../img/Dataset/Cat/tiger.png
+output_dir="test"
 
 # Dataset info
-dataset='ffhq'
-frozen_gen_ckpt=../weights/stylegan2-ffhq-config-f.pt
-psp_path=../weights/psp_weights/e4e_ffhq_encode.pt
+dataset='car'
+frozen_gen_ckpt=../weights/stylegan2-car-config-f.pt
+psp_path=../weights/psp_weights/e4e_cars_encode.pt
 
 
 CUDA_VISIBLE_DEVICES=$cuda_id python train.py  \
@@ -27,7 +27,7 @@ CUDA_VISIBLE_DEVICES=$cuda_id python train.py  \
                 --lr 0.002 \
                 --frozen_gen_ckpt $frozen_gen_ckpt \
                 --psp_path $psp_path \
-                --iter 301 \
+                --iter 451 \
                 --source_class "photo" \
                 --target_class "$target_class" \
                 --source_type $source_type \
@@ -36,7 +36,7 @@ CUDA_VISIBLE_DEVICES=$cuda_id python train.py  \
                 --auto_layer_iters 0 --auto_layer_batch 8 \
                 --output_interval 50 \
                 --mixing 0.0 \
-                --save_interval 1000 \
+                --save_interval 450 \
                 --clip_models "ViT-B/32" "ViT-B/16" \
                 --psp_loss_type $psp_loss_type \
                 --clip_model_weights 1.0 1.0 \

@@ -224,13 +224,16 @@ if __name__ == "__main__":
         'car': 512,
     }
     # save snapshot of code / args before training.
-    args.output_dir = os.path.join("../results", "demo_" + args.dataset, \
+    args.output_dir = os.path.join("../paper_results", "demo_" + args.dataset, \
         args.source_class.replace(" ", '_') + "+" + args.target_class.replace(" ", "_"), \
             args.output_dir)
     args.size = dataset_size[args.dataset]
     os.makedirs(os.path.join(args.output_dir, "code"), exist_ok=True)
     copytree("criteria/", os.path.join(args.output_dir, "code", "criteria"), )
     shutil.copy2("model/ZSSGAN.py", os.path.join(args.output_dir, "code", "ZSSGAN.py"))
+
+    img_type = args.style_img_dir.split(".")[-1]
+    shutil.copy2(args.style_img_dir, os.path.join(args.output_dir, f'target.{img_type}'))
     
     with open(os.path.join(args.output_dir, "args.json"), 'w') as f:
         json.dump(args.__dict__, f, indent=2)
